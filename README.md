@@ -1,5 +1,6 @@
-# Random Patches
-A collection of in-game fixes that don't affect gameplay much, but make the game faster, more stable, and more enjoyable.
+# gLua Patches
+A collection of fixes and improvements aimed at improving the game experience and performance of Garry's Mod.
 
-## Where is Lua code?
-Written in [Yuescript](https://github.com/pigpigyyy/Yuescript), compiled Lua code can be found in [releases](https://github.com/Pika-Software/random-patches/releases) and [lua branch](https://github.com/Pika-Software/random-patches/tree/lua), or you can compile it yourself using compiled [Yuescript Compiler](https://github.com/pigpigyyy/Yuescript/releases/latest).
+#### NOTE: The source code for `Random Patches` has been reworked and rewritten in `Lua`.
+
+#### NOTE: The name of this addon was also changed in order to reset the absurdly overstated version to a more adequate one.
