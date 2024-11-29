@@ -605,7 +605,7 @@ if CLIENT or SERVER then
     -- Screen resolution cache
     if CLIENT then
 
-        local screenWidth, screenHeight = 0, 0
+        local screenWidth, screenHeight = _G.ScrW(), _G.ScrH()
 
         _G.ScrW = function() return screenWidth end
         _G.ScrH = function() return screenHeight end
