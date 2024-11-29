@@ -3,7 +3,7 @@ local _G = _G
 if _G.__gluaPatches then return end
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.0.0"
+local addon_name = "gLua Patches v1.0.1"
 
 local math, table, hook = _G.math, _G.table, _G.hook
 local pairs, tonumber, getmetatable, setmetatable, FindMetaTable = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable
