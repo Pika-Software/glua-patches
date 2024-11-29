@@ -3,7 +3,7 @@ local _G = _G
 if _G.__gluaPatches then return end
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.0.1"
+local addon_name = "gLua Patches v1.0.2"
 
 local math, table, hook = _G.math, _G.table, _G.hook
 local pairs, tonumber, getmetatable, setmetatable, FindMetaTable = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable
@@ -238,8 +238,8 @@ if CLIENT or SERVER then
     function _G.isentity( value )
         if value == NULL then return true end
         local metatable = getmetatable( value )
-        if metatable == ENTITY then return true end
-        return metatable.MetaID == 9
+        if metatable == nil then return false end
+        return metatable == ENTITY or metatable.MetaID == 9
     end
 
     ---@class Player
