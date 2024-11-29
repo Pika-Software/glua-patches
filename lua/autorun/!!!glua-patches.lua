@@ -3,12 +3,11 @@ local _G = _G
 if _G.__gluaPatches then return end
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.0.2"
+local addon_name = "gLua Patches v1.1.0"
 
-local math, table, hook = _G.math, _G.table, _G.hook
+local math, table = _G.math, _G.table
 local pairs, tonumber, getmetatable, setmetatable, FindMetaTable = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable
 local math_min, math_max, math_random = math.min, math.max, math.random
-local hook_Add, hook_Remove = hook.Add, hook.Remove
 
 local MENU = _G.MENU_DLL == true
 local CLIENT = _G.CLIENT == true and not MENU
@@ -17,6 +16,12 @@ local SERVER = _G.SERVER == true and not MENU
 -- ULib support ( I really don't like this )
 if ( CLIENT or SERVER ) and _G.file.Exists( "ulib/shared/hook.lua", "LUA" ) then
     _G.include( "ulib/shared/hook.lua" )
+end
+
+local hook_Add, hook_Remove
+do
+    local hook = _G.hook
+    hook_Add, hook_Remove = hook.Add, hook.Remove
 end
 
 local PRE_HOOK = _G.PRE_HOOK or -2
@@ -549,56 +554,77 @@ if CLIENT or SERVER then
 
     end
 
-    local ents, player = _G.ents, _G.player
-    local inext = ipairs( ents )
-
     -- Faster iterators
     do
 
-        local players = player.GetAll()
-        local entities = ents.GetAll()
+        local ents, player = _G.ents, _G.player
+        local table_remove = table.remove
+        local inext = ipairs( ents )
 
-        function player.GetAll()
-            return players
-        end
+        local entities = ents.GetAll()
+        local entity_count = #entities
 
         function ents.GetAll()
             return entities
         end
 
-        hook_Add( "OnEntityCreated", addon_name .. " - Faster iterator's", function( entity )
-            if entity:IsPlayer() then
-                players[ #players + 1 ] = entity
-            end
-
-            entities[ #entities + 1 ] = entity
-        end, PRE_HOOK )
-
-        hook_Add( "EntityRemoved", addon_name .. " - Faster iterator's", function( entity )
-            for i = #entities, 1, -1 do
-                if entities[ i ] == entity then
-                    table.remove( entities, i )
-                    break
-                end
-            end
-
-            if entity:IsPlayer() then
-                for i = #players, 1, -1 do
-                    if players[ i ] == entity then
-                        table.remove( players, i )
-                        break
-                    end
-                end
-            end
-        end, PRE_HOOK )
+        function ents.GetCount()
+            return entity_count
+        end
 
         function ents.Iterator()
             return inext, entities, 0
         end
 
+        local players = player.GetAll()
+        local player_count = #players
+
+        function player.GetAll()
+            return players
+        end
+
+        function player.GetCount()
+            return player_count
+        end
+
         function player.Iterator()
             return inext, players, 0
         end
+
+        hook_Add( "OnEntityCreated", addon_name .. " - Faster iterator's", function( entity )
+            -- shitty code protection
+            for i = entity_count, 1, -1 do
+                if entities[ i ] == entity then return end
+            end
+
+            if entity:IsPlayer() then
+                player_count = player_count + 1
+                players[ player_count ] = entity
+            end
+
+            entity_count = entity_count + 1
+            entities[ entity_count ] = entity
+        end, PRE_HOOK )
+
+        hook_Add( "EntityRemoved", addon_name .. " - Faster iterator's", function( entity )
+            for i = entity_count, 1, -1 do
+                if entities[ i ] == entity then
+                    entity_count = entity_count - 1
+                    table_remove( entities, i )
+                    break
+                end
+            end
+
+            if entity:IsPlayer() then
+                for i = player_count, 1, -1 do
+                    if players[ i ] == entity then
+                        player_count = player_count - 1
+                        table_remove( players, i )
+                        break
+                    end
+                end
+            end
+        end, PRE_HOOK )
 
     end
 
@@ -1040,6 +1066,7 @@ do
     local debug_setmetatable = _G.debug.setmetatable
 
     -- isnumber
+    local isnumber
     do
 
         local object = 0
@@ -1051,9 +1078,11 @@ do
 
         ---@param value any
         ---@return boolean
-        function _G.isnumber( value )
+        function isnumber( value )
             return getmetatable( value ) == metatable
         end
+
+        _G.isnumber = isnumber
 
     end
 
@@ -1065,6 +1094,17 @@ do
         if metatable == nil then
             metatable = {}
             debug_setmetatable( object, metatable )
+        end
+
+        local string = _G.string
+        local string_sub = string.sub
+
+        function metatable:__index( key )
+            if isnumber( key ) then
+                return string_sub( self, key, key )
+            else
+                return string[ key ]
+            end
         end
 
         ---@param value any
