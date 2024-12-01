@@ -1,9 +1,12 @@
 local _G = _G
 
+-- Already patched
 if _G.__gluaPatches then return end
+
+---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.1.0"
+local addon_name = "gLua Patches v1.2.0"
 
 local math, table = _G.math, _G.table
 local pairs, tonumber, getmetatable, setmetatable, FindMetaTable = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable
@@ -18,14 +21,19 @@ if ( CLIENT or SERVER ) and _G.file.Exists( "ulib/shared/hook.lua", "LUA" ) then
     _G.include( "ulib/shared/hook.lua" )
 end
 
+--- Srlion's Hook Library ( https://github.com/Srlion/Hook-Library )
+---@diagnostic disable-next-line: undefined-field
+local PRE_HOOK = _G.PRE_HOOK or -2
+
+--- Srlion's Hook Library ( https://github.com/Srlion/Hook-Library )
+---@diagnostic disable-next-line: undefined-field
+local PRE_HOOK_RETURN = _G.PRE_HOOK_RETURN or -1
+
 local hook_Add, hook_Remove
 do
     local hook = _G.hook
     hook_Add, hook_Remove = hook.Add, hook.Remove
 end
-
-local PRE_HOOK = _G.PRE_HOOK or -2
-local PRE_HOOK_RETURN = _G.PRE_HOOK_RETURN or -1
 
 ---@param tbl table
 function table.Empty( tbl )
@@ -227,6 +235,182 @@ do
 
 end
 
+do
+
+    local function math_Rand( low, high )
+        return low + ( high - low ) * math_random()
+    end
+
+    math.Rand = math_Rand
+
+    do
+
+        local Vector = Vector
+
+        function VectorRand( min, max )
+            min, max = min or -1, max or 1
+            return Vector( math_Rand( min, max ), math_Rand( min, max ), math_Rand( min, max ) )
+        end
+
+    end
+
+    do
+
+        local Angle = Angle
+
+        function AngleRand( min, max )
+            return Angle( math_Rand( min or -90, max or 90 ), math_Rand( min or -180, max or 180 ), math_Rand( min or -180, max or 180 ) )
+        end
+
+    end
+
+end
+
+do
+
+    local debug_setmetatable = _G.debug.setmetatable
+
+    -- isnumber
+    local isnumber
+    do
+
+        local object = 0
+        local metatable = getmetatable( object )
+        if metatable == nil then
+            metatable = {}
+            debug_setmetatable( object, metatable )
+        end
+
+        ---@param value any
+        ---@return boolean
+        function isnumber( value )
+            return getmetatable( value ) == metatable
+        end
+
+        _G.isnumber = isnumber
+
+    end
+
+    -- isstring
+    do
+
+        local object = ""
+        local metatable = getmetatable( object )
+        if metatable == nil then
+            metatable = {}
+            debug_setmetatable( object, metatable )
+        end
+
+        local string = _G.string
+        local string_sub = string.sub
+
+        function metatable:__index( key )
+            if isnumber( key ) then
+                return string_sub( self, key, key )
+            else
+                return string[ key ]
+            end
+        end
+
+        ---@param value any
+        ---@return boolean
+        function _G.isstring( value )
+            return getmetatable( value ) == metatable
+        end
+
+    end
+
+    -- isbool
+    do
+
+        local object = true
+        local metatable = getmetatable( object )
+        if metatable == nil then
+            metatable = {}
+            debug_setmetatable( object, metatable )
+        end
+
+        ---@param value any
+        ---@return boolean
+        function _G.isbool( value )
+            return getmetatable( value ) == metatable
+        end
+
+    end
+
+    -- isfunction
+    do
+
+        local object = function() end
+        local metatable = getmetatable( object )
+        if metatable == nil then
+            metatable = {}
+            debug_setmetatable( object, metatable )
+        end
+
+        ---@param value any
+        ---@return boolean
+        function _G.isfunction( value )
+            return getmetatable( value ) == metatable
+        end
+
+    end
+
+end
+
+-- isangle
+do
+
+    local ANGLE = FindMetaTable( "Angle" )
+
+    ---@param value any
+    ---@return boolean
+    function _G.isangle( value )
+        return getmetatable( value ) == ANGLE
+    end
+
+end
+
+-- isvector
+do
+
+    local VECTOR = FindMetaTable( "Vector" )
+
+    ---@param value any
+    ---@return boolean
+    function _G.isvector( value )
+        return getmetatable( value ) == VECTOR
+    end
+
+end
+
+-- ismatrix
+do
+
+    local MATRIX = FindMetaTable( "VMatrix" )
+
+    ---@param value any
+    ---@return boolean
+    function _G.ismatrix( value )
+        return getmetatable( value ) == MATRIX
+    end
+
+end
+
+-- ispanel
+if CLIENT or MENU then
+
+    local PANEL = FindMetaTable( "Panel" )
+
+    ---@param value any
+    ---@return boolean
+    function _G.ispanel( value )
+        local metatable = getmetatable( value )
+        return metatable and ( metatable == PANEL or metatable.MetaID == 22 )
+    end
+
+end
+
 if CLIENT or SERVER then
     local returnFalse = function() return false end
     local returnTrue = function() return true end
@@ -408,6 +592,7 @@ if CLIENT or SERVER then
                     if convar:GetBool() then return end
                     chat_Close()
                     return true
+                    ---@diagnostic disable-next-line: redundant-parameter
                 end, PRE_HOOK_RETURN )
 
                 _G.cvars.AddChangeCallback( "cl_drawhud", chat_Close, addon_name .. " - cl_drawhud chat fix" )
@@ -437,6 +622,7 @@ if CLIENT or SERVER then
                 end
 
                 _G.cvars.OnConVarChanged( name, old, data.cvarvalue )
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
         end
@@ -491,6 +677,7 @@ if CLIENT or SERVER then
 
                     if HasFocus() then return end
                     lastNoFocusTime = CurTime()
+                    ---@diagnostic disable-next-line: redundant-parameter
                 end, PRE_HOOK )
 
             end
@@ -514,6 +701,7 @@ if CLIENT or SERVER then
 
                     ui_state = true
                 end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
         end
@@ -534,22 +722,59 @@ if CLIENT or SERVER then
     do
 
         local ENTITY_EntIndex = ENTITY.EntIndex
-        local indexes = {}
+        local Entity = _G.Entity
+
+        local index2entity = {}
+        setmetatable( index2entity, {
+            __index = function( _, index )
+                local entity = Entity( index )
+                if entity == NULL then
+                    return entity
+                end
+
+                if ENTITY_IsValid( entity ) then
+                    rawset( index2entity, index, entity )
+                end
+
+                return entity
+            end
+        } )
+
+        local entity2index = {}
+        setmetatable( entity2index, {
+            __index = function( _, entity )
+                return ENTITY_EntIndex( entity )
+            end
+        } )
+
+        -- World entity support
+        hook.Add( "InitPostEntity", addon_name .. " - Entity index cache", function()
+            local world = game.GetWorld()
+            index2entity[ 0 ] = world
+            entity2index[ world ] = 0
+        end )
 
         function ENTITY:EntIndex()
-            local index = indexes[ self ]
-            if index == nil then
-                index = ENTITY_EntIndex( self )
-                indexes[ self ] = index
-            end
-
-            return index
+            return entity2index[ self ]
         end
 
+        function _G.Entity( index )
+            return index2entity[ index ]
+        end
+
+        hook_Add( "OnEntityCreated", addon_name .. " - Entity index cache", function( entity )
+            local index = ENTITY_EntIndex( entity )
+            index2entity[ index ] = entity
+            entity2index[ entity ] = index
+            ---@diagnostic disable-next-line: redundant-parameter
+        end, PRE_HOOK )
+
         hook_Add( "EntityRemoved", addon_name .. " - Entity index cache", function( entity )
+            index2entity[ ENTITY_EntIndex( entity ) ] = nil
             timer_Simple( 0, function()
-                indexes[ entity ] = nil
+                entity2index[ entity ] = nil
             end )
+            ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
     end
@@ -604,6 +829,7 @@ if CLIENT or SERVER then
 
             entity_count = entity_count + 1
             entities[ entity_count ] = entity
+            ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
         hook_Add( "EntityRemoved", addon_name .. " - Faster iterator's", function( entity )
@@ -624,6 +850,7 @@ if CLIENT or SERVER then
                     end
                 end
             end
+            ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
     end
@@ -638,6 +865,7 @@ if CLIENT or SERVER then
 
         hook_Add( "OnScreenSizeChanged", addon_name .. " - Screen resolution cache", function( _, __, width, height )
             screenWidth, screenHeight = width, height
+            ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
     end
@@ -823,6 +1051,7 @@ if CLIENT or SERVER then
                     steamids64[ entity ] = nil
                 end
             end )
+            ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
     end
@@ -838,6 +1067,7 @@ if CLIENT or SERVER then
 
             hook_Add( "PlayerFootstep", addon_name .. " - No more fake footsteps", function( ply )
                 if not IsOnGround( ply ) and GetMoveType( ply ) ~= MOVETYPE_LADDER then return true end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK_RETURN )
 
         end
@@ -848,6 +1078,7 @@ if CLIENT or SERVER then
         hook_Add( "StartCommand", addon_name .. " - No more air crouching", function( ply, cmd )
             if GetMoveType( ply ) == MOVETYPE_NOCLIP or IsOnGround( ply ) or cmd:KeyDown( IN_DUCK ) or not ply:Crouching() then return end
             cmd:AddKey( IN_DUCK )
+            ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
     end
@@ -871,6 +1102,7 @@ if CLIENT or SERVER then
                     ply:RemoveAllDecals()
                 end
             end )
+            ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
     end
@@ -889,6 +1121,7 @@ if CLIENT or SERVER then
             hook_Add( "PlayerInitialSpawn", addon_name .. " - License check", function( ply )
                 if sv_lan:GetBool() or ply:IsBot() or ply:IsListenServerHost() or ply:IsFullyAuthenticated() then return end
                 ply:Kick( "Your SteamID wasn\'t fully authenticated, try restart your Steam client." )
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
         end
@@ -929,6 +1162,7 @@ if CLIENT or SERVER then
                             ENTITY_Fire( portal, "open" )
                         end
                     end
+                    ---@diagnostic disable-next-line: redundant-parameter
                 end, PRE_HOOK )
             end
 
@@ -936,9 +1170,15 @@ if CLIENT or SERVER then
                 hook_Remove( "EntityRemoved", addon_name .. " - func_areaportal" )
             end
 
+            ---@diagnostic disable-next-line: redundant-parameter
             hook_Add( "PostCleanupMap", addon_name .. " - func_areaportal", start, PRE_HOOK )
+
+            ---@diagnostic disable-next-line: redundant-parameter
             hook_Add( "PreCleanupMap", addon_name .. " - func_areaportal", stop, PRE_HOOK )
+
+            ---@diagnostic disable-next-line: redundant-parameter
             hook_Add( "ShutDown", addon_name .. " - func_areaportal", stop, PRE_HOOK )
+
             start()
 
         end
@@ -954,6 +1194,7 @@ if CLIENT or SERVER then
                     entity:PhysicsInit( SOLID_VPHYSICS )
                     entity:PhysWake()
                 end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
         end
@@ -970,12 +1211,14 @@ if CLIENT or SERVER then
                 if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
                     entity:AddEFlags( EFL_NO_THINK_FUNCTION )
                 end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
             hook_Add( "PlayerLeaveVehicle", addon_name .. " - Kefta podfix", function( _, entity )
                 if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
                     entities[ #entities + 1 ] = entity
                 end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
             local function removeEntityFromList( entity )
@@ -992,12 +1235,14 @@ if CLIENT or SERVER then
                     entity:RemoveEFlags( EFL_NO_THINK_FUNCTION )
                     removeEntityFromList( entity )
                 end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
             hook_Add( "EntityRemoved", addon_name .. " - prop_vehicle_prisoner_pod", function( entity )
                 if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
                     removeEntityFromList( entity )
                 end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
             hook_Add( "Think", addon_name .. " - Kefta podfix", function()
@@ -1009,6 +1254,7 @@ if CLIENT or SERVER then
                         entity:AddEFlags( EFL_NO_THINK_FUNCTION )
                     end
                 end
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
         end
@@ -1022,186 +1268,11 @@ if CLIENT or SERVER then
             hook_Add( "EntityTakeDamage", addon_name .. " - prop_vehicle_prisoner_pod damage fix", function( entity, damageInfo )
                 if ENTITY_GetClass( entity ) ~= "prop_vehicle_prisoner_pod" or entity.AcceptDamageForce then return end
                 ENTITY_TakePhysicsDamage( entity, damageInfo )
+                ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
         end
 
-    end
-
-end
-
-do
-
-    local function math_Rand( low, high )
-        return low + ( high - low ) * math_random()
-    end
-
-    math.Rand = math_Rand
-
-    do
-
-        local Vector = Vector
-
-        function VectorRand( min, max )
-            min, max = min or -1, max or 1
-            return Vector( math_Rand( min, max ), math_Rand( min, max ), math_Rand( min, max ) )
-        end
-
-    end
-
-    do
-
-        local Angle = Angle
-
-        function AngleRand( min, max )
-            return Angle( math_Rand( min or -90, max or 90 ), math_Rand( min or -180, max or 180 ), math_Rand( min or -180, max or 180 ) )
-        end
-
-    end
-
-end
-
-do
-
-    local debug_setmetatable = _G.debug.setmetatable
-
-    -- isnumber
-    local isnumber
-    do
-
-        local object = 0
-        local metatable = getmetatable( object )
-        if metatable == nil then
-            metatable = {}
-            debug_setmetatable( object, metatable )
-        end
-
-        ---@param value any
-        ---@return boolean
-        function isnumber( value )
-            return getmetatable( value ) == metatable
-        end
-
-        _G.isnumber = isnumber
-
-    end
-
-    -- isstring
-    do
-
-        local object = ""
-        local metatable = getmetatable( object )
-        if metatable == nil then
-            metatable = {}
-            debug_setmetatable( object, metatable )
-        end
-
-        local string = _G.string
-        local string_sub = string.sub
-
-        function metatable:__index( key )
-            if isnumber( key ) then
-                return string_sub( self, key, key )
-            else
-                return string[ key ]
-            end
-        end
-
-        ---@param value any
-        ---@return boolean
-        function _G.isstring( value )
-            return getmetatable( value ) == metatable
-        end
-
-    end
-
-    -- isbool
-    do
-
-        local object = true
-        local metatable = getmetatable( object )
-        if metatable == nil then
-            metatable = {}
-            debug_setmetatable( object, metatable )
-        end
-
-        ---@param value any
-        ---@return boolean
-        function _G.isbool( value )
-            return getmetatable( value ) == metatable
-        end
-
-    end
-
-    -- isfunction
-    do
-
-        local object = function() end
-        local metatable = getmetatable( object )
-        if metatable == nil then
-            metatable = {}
-            debug_setmetatable( object, metatable )
-        end
-
-        ---@param value any
-        ---@return boolean
-        function _G.isfunction( value )
-            return getmetatable( value ) == metatable
-        end
-
-    end
-
-end
-
--- isangle
-do
-
-    local ANGLE = FindMetaTable( "Angle" )
-
-    ---@param value any
-    ---@return boolean
-    function _G.isangle( value )
-        return getmetatable( value ) == ANGLE
-    end
-
-end
-
--- isvector
-do
-
-    local VECTOR = FindMetaTable( "Vector" )
-
-    ---@param value any
-    ---@return boolean
-    function _G.isvector( value )
-        return getmetatable( value ) == VECTOR
-    end
-
-end
-
--- ismatrix
-do
-
-    local MATRIX = FindMetaTable( "VMatrix" )
-
-    ---@param value any
-    ---@return boolean
-    function _G.ismatrix( value )
-        return getmetatable( value ) == MATRIX
-    end
-
-end
-
--- ispanel
-do
-
-    local PANEL = FindMetaTable( "Panel" )
-
-    ---@param value any
-    ---@return boolean
-    function _G.ispanel( value )
-        local metatable = getmetatable( value )
-        return metatable and ( metatable == PANEL or metatable.MetaID == 22 )
     end
 
 end
