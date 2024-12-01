@@ -520,11 +520,12 @@ if CLIENT or SERVER then
             local render = _G.render
             local directx_level = render.GetDXLevel()
 
+            -- https://wiki.facepunch.com/gmod/render.GetDXLevel
             function render.GetDXLevel()
                 return directx_level
             end
 
-            -- Whether the hardware supports HDR.
+            -- https://wiki.facepunch.com/gmod/render.SupportsPixelShaders_1_4
             do
 
                 local hdr_supported = directx_level >= 80
@@ -535,7 +536,7 @@ if CLIENT or SERVER then
 
             end
 
-            -- Whether Pixel Shaders 1.4 are supported or not.
+            -- https://wiki.facepunch.com/gmod/render.SupportsPixelShaders_1_4
             do
                 local ps_1_4_supported = render.SupportsPixelShaders_1_4()
 
@@ -545,7 +546,7 @@ if CLIENT or SERVER then
 
             end
 
-            -- Whether Pixel Shaders 2.0 are supported or not.
+            -- https://wiki.facepunch.com/gmod/render.SupportsPixelShaders_2_0
             do
 
                 local ps_2_0_supported = render.SupportsPixelShaders_2_0()
@@ -556,13 +557,37 @@ if CLIENT or SERVER then
 
             end
 
-            -- Whether Vertex Shaders 2.0 are supported or not.
+            -- https://wiki.facepunch.com/gmod/render.SupportsVertexShaders_2_0
             do
 
                 local vs_2_0_supported = render.SupportsVertexShaders_2_0()
 
                 function render.SupportsVertexShaders_2_0()
                     return vs_2_0_supported
+                end
+
+            end
+
+            local render_SetMaterial = render.SetMaterial
+
+            -- https://wiki.facepunch.com/gmod/render.SetColorMaterial
+            do
+
+                local color = Material( "color" )
+
+                function render.SetColorMaterial()
+                    return render_SetMaterial( color )
+                end
+
+            end
+
+            -- https://wiki.facepunch.com/gmod/render.SetColorMaterialIgnoreZ
+            do
+
+                local color_ignorez = Material( "color_ignorez" )
+
+                function render.SetColorMaterialIgnoreZ()
+                    return render_SetMaterial( color_ignorez )
                 end
 
             end
