@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.2.0"
+local addon_name = "gLua Patches v1.3.0"
 
 local math, table = _G.math, _G.table
 local pairs, tonumber, getmetatable, setmetatable, FindMetaTable = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable
@@ -514,6 +514,61 @@ if CLIENT or SERVER then
     end
 
     if CLIENT then
+        -- DirectX level caching
+        do
+
+            local render = _G.render
+            local directx_level = render.GetDXLevel()
+
+            function render.GetDXLevel()
+                return directx_level
+            end
+
+            -- Whether the hardware supports HDR.
+            do
+
+                local hdr_supported = directx_level >= 80
+
+                function render.SupportsHDR()
+                    return hdr_supported
+                end
+
+            end
+
+            -- Whether Pixel Shaders 1.4 are supported or not.
+            do
+                local ps_1_4_supported = render.SupportsPixelShaders_1_4()
+
+                function render.SupportsPixelShaders_1_4()
+                    return ps_1_4_supported
+                end
+
+            end
+
+            -- Whether Pixel Shaders 2.0 are supported or not.
+            do
+
+                local ps_2_0_supported = render.SupportsPixelShaders_2_0()
+
+                function render.SupportsPixelShaders_2_0()
+                    return ps_2_0_supported
+                end
+
+            end
+
+            -- Whether Vertex Shaders 2.0 are supported or not.
+            do
+
+                local vs_2_0_supported = render.SupportsVertexShaders_2_0()
+
+                function render.SupportsVertexShaders_2_0()
+                    return vs_2_0_supported
+                end
+
+            end
+
+        end
+
         -- Faster cam functions
         do
 
