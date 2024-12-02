@@ -935,21 +935,6 @@ if CLIENT or SERVER then
 
     end
 
-    -- Screen resolution cache
-    if CLIENT then
-
-        local screenWidth, screenHeight = _G.ScrW(), _G.ScrH()
-
-        _G.ScrW = function() return screenWidth end
-        _G.ScrH = function() return screenHeight end
-
-        hook_Add( "OnScreenSizeChanged", addon_name .. " - Screen resolution cache", function( _, __, width, height )
-            screenWidth, screenHeight = width, height
-            ---@diagnostic disable-next-line: redundant-parameter
-        end, PRE_HOOK )
-
-    end
-
     ENTITY.IsPlayer = returnFalse
     ENTITY.IsWeapon = returnFalse
     ENTITY.IsNPC = returnFalse
