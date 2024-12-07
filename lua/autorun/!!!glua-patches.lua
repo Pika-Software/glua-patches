@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.3.1"
+local addon_name = "gLua Patches v1.4.0"
 
 local math, table = _G.math, _G.table
 local pairs, tonumber, getmetatable, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -397,6 +397,62 @@ do
 
 end
 
+do
+
+    local system = _G.system
+
+    do
+
+        local is_linux = system.IsLinux()
+
+        function system.IsLinux()
+            return is_linux
+        end
+
+    end
+
+    do
+
+        local is_osx = system.IsOSX()
+
+        function system.IsOSX()
+            return is_osx
+        end
+
+    end
+
+    do
+
+        local is_windows = system.IsWindows()
+
+        function system.IsWindows()
+            return is_windows
+        end
+
+    end
+
+    local system_BatteryPower = system.BatteryPower
+    local system_HasFocus = system.HasFocus
+
+    local battery_power = system_BatteryPower()
+    local has_focus = system_HasFocus()
+
+    function system.BatteryPower()
+        return battery_power
+    end
+
+    function system.HasFocus()
+        return has_focus
+    end
+
+    hook_Add( "Tick", addon_name .. " - system.HasFocus", function()
+        battery_power = system_BatteryPower()
+        has_focus = system_HasFocus()
+        ---@diagnostic disable-next-line: redundant-parameter
+    end, PRE_HOOK )
+
+end
+
 -- ispanel
 if CLIENT or MENU then
 
@@ -634,26 +690,6 @@ if CLIENT or SERVER then
                     end
 
                     return cam_Start( view )
-                end
-
-            end
-
-            -- https://github.com/Facepunch/garrysmod-issues/issues/1091
-            do
-
-                local cam_StartOrthoView = cam.StartOrthoView
-                local cam_EndOrthoView = cam.EndOrthoView
-                local cam_stack = 0
-
-                function cam.StartOrthoView( ... )
-                    cam_stack = cam_stack + 1
-                    return cam_StartOrthoView( ... )
-                end
-
-                function cam.EndOrthoView()
-                    if cam_stack == 0 then return end
-                    cam_stack = math_max( 0, cam_stack - 1 )
-                    return cam_EndOrthoView()
                 end
 
             end
