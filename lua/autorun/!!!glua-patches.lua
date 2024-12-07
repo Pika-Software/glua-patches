@@ -6,10 +6,10 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.3.0"
+local addon_name = "gLua Patches v1.3.1"
 
 local math, table = _G.math, _G.table
-local pairs, tonumber, getmetatable, setmetatable, FindMetaTable = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable
+local pairs, tonumber, getmetatable, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
 local math_min, math_max, math_random = math.min, math.max, math.random
 
 local MENU = _G.MENU_DLL == true
@@ -870,7 +870,12 @@ if CLIENT or SERVER then
         local entity_count = #entities
 
         function ents.GetAll()
-            return entities
+            local copy = {}
+            for i = 1, entity_count do
+                rawset( copy, i, rawget( entities, i ) )
+            end
+
+            return copy
         end
 
         function ents.GetCount()
@@ -885,7 +890,12 @@ if CLIENT or SERVER then
         local player_count = #players
 
         function player.GetAll()
-            return players
+            local copy = {}
+            for i = 1, player_count do
+                rawset( copy, i, rawget( players, i ) )
+            end
+
+            return copy
         end
 
         function player.GetCount()
