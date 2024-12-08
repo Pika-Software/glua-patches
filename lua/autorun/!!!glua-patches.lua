@@ -441,7 +441,7 @@ do
         return has_focus
     end
 
-    hook_Add( "Tick", addon_name .. " - system.HasFocus", function()
+    hook_Add( "Tick", addon_name .. " - system.BatteryPower & system.HasFocus", function()
         battery_power = system_BatteryPower()
         has_focus = system_HasFocus()
         ---@diagnostic disable-next-line: redundant-parameter
