@@ -29,11 +29,7 @@ local PRE_HOOK = _G.PRE_HOOK or -2
 ---@diagnostic disable-next-line: undefined-field
 local PRE_HOOK_RETURN = _G.PRE_HOOK_RETURN or -1
 
-local hook_Add, hook_Remove
-do
-    local hook = _G.hook
-    hook_Add, hook_Remove = hook.Add, hook.Remove
-end
+local hook_Add, hook_Remove = _G.hook.Add, _G.hook.Remove
 
 ---@param tbl table
 function table.Empty( tbl )
@@ -864,7 +860,7 @@ if CLIENT or SERVER then
         } )
 
         -- World entity support
-        hook.Add( "InitPostEntity", addon_name .. " - Entity index cache", function()
+        hook_Add( "InitPostEntity", addon_name .. " - Entity index cache", function()
             local world = game.GetWorld()
             index2entity[ 0 ] = world
             entity2index[ world ] = 0
