@@ -6,11 +6,12 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.4.1"
+local addon_name = "gLua Patches v1.4.2"
 
 local math, table = _G.math, _G.table
-local pairs, tonumber, getmetatable, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
+local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
 local math_min, math_max, math_random = math.min, math.max, math.random
+local debug_getmetatable = _G.debug.getmetatable
 
 local MENU = _G.MENU_DLL == true
 local CLIENT = _G.CLIENT == true and not MENU
@@ -147,7 +148,7 @@ do
     ---@param value any
     ---@return boolean
     function _G.IsColor( value )
-        return getmetatable( value ) == COLOR
+        return debug_getmetatable( value ) == COLOR
     end
 
     ---@param r number
@@ -260,7 +261,7 @@ do
     do
 
         local object = 0
-        local metatable = getmetatable( object )
+        local metatable = debug_getmetatable( object )
         if metatable == nil then
             metatable = {}
             debug_setmetatable( object, metatable )
@@ -269,7 +270,7 @@ do
         ---@param value any
         ---@return boolean
         function isnumber( value )
-            return getmetatable( value ) == metatable
+            return debug_getmetatable( value ) == metatable
         end
 
         _G.isnumber = isnumber
@@ -280,7 +281,7 @@ do
     do
 
         local object = ""
-        local metatable = getmetatable( object )
+        local metatable = debug_getmetatable( object )
         if metatable == nil then
             metatable = {}
             debug_setmetatable( object, metatable )
@@ -300,7 +301,7 @@ do
         ---@param value any
         ---@return boolean
         function _G.isstring( value )
-            return getmetatable( value ) == metatable
+            return debug_getmetatable( value ) == metatable
         end
 
     end
@@ -309,7 +310,7 @@ do
     do
 
         local object = true
-        local metatable = getmetatable( object )
+        local metatable = debug_getmetatable( object )
         if metatable == nil then
             metatable = {}
             debug_setmetatable( object, metatable )
@@ -318,7 +319,7 @@ do
         ---@param value any
         ---@return boolean
         function _G.isbool( value )
-            return getmetatable( value ) == metatable
+            return debug_getmetatable( value ) == metatable
         end
 
     end
@@ -327,7 +328,7 @@ do
     do
 
         local object = function() end
-        local metatable = getmetatable( object )
+        local metatable = debug_getmetatable( object )
         if metatable == nil then
             metatable = {}
             debug_setmetatable( object, metatable )
@@ -336,7 +337,7 @@ do
         ---@param value any
         ---@return boolean
         function _G.isfunction( value )
-            return getmetatable( value ) == metatable
+            return debug_getmetatable( value ) == metatable
         end
 
     end
@@ -351,7 +352,7 @@ do
     ---@param value any
     ---@return boolean
     function _G.isangle( value )
-        return getmetatable( value ) == ANGLE
+        return debug_getmetatable( value ) == ANGLE
     end
 
 end
@@ -364,7 +365,7 @@ do
     ---@param value any
     ---@return boolean
     function _G.isvector( value )
-        return getmetatable( value ) == VECTOR
+        return debug_getmetatable( value ) == VECTOR
     end
 
 end
@@ -377,7 +378,7 @@ do
     ---@param value any
     ---@return boolean
     function _G.ismatrix( value )
-        return getmetatable( value ) == MATRIX
+        return debug_getmetatable( value ) == MATRIX
     end
 
 end
@@ -446,7 +447,7 @@ if CLIENT or MENU then
     ---@param value any
     ---@return boolean
     function _G.ispanel( value )
-        local metatable = getmetatable( value )
+        local metatable = debug_getmetatable( value )
         return metatable and ( metatable == PANEL or metatable.MetaID == 22 )
     end
 
@@ -467,7 +468,7 @@ if CLIENT or SERVER then
     ---@return boolean
     function _G.isentity( value )
         if value == NULL then return true end
-        local metatable = getmetatable( value )
+        local metatable = debug_getmetatable( value )
         if metatable == nil then return false end
         return metatable == ENTITY or metatable.MetaID == 9
     end
