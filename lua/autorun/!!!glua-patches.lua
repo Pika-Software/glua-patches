@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.4.2"
+local addon_name = "gLua Patches v1.4.3"
 
 local math, table = _G.math, _G.table
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -88,7 +88,7 @@ function table.Random( tbl )
     local index = math_random( 1, count )
 
     for key, value in pairs( tbl ) do
-        if index == 0 then
+        if index == 1 then
             return value, key
         else
             index = index - 1
@@ -292,6 +292,9 @@ do
 
         function metatable:__index( key )
             if isnumber( key ) then
+                ---@diagnostic disable-next-line: cast-type-mismatch
+                ---@cast self string
+                ---@cast key number
                 return string_sub( self, key, key )
             else
                 return string[ key ]
@@ -431,11 +434,11 @@ do
         return has_focus
     end
 
-    hook_Add( "Tick", addon_name .. " - system.BatteryPower & system.HasFocus", function()
+    _G.timer.Create( addon_name .. " - system.BatteryPower & system.HasFocus", 0.05, 0, function()
         battery_power = system_BatteryPower()
         has_focus = system_HasFocus()
         ---@diagnostic disable-next-line: redundant-parameter
-    end, PRE_HOOK )
+    end )
 
 end
 
