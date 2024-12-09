@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.4.0"
+local addon_name = "gLua Patches v1.4.1"
 
 local math, table = _G.math, _G.table
 local pairs, tonumber, getmetatable, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.getmetatable, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -64,46 +64,35 @@ do
 
 end
 
-do
-
-    local index, length = 1, 0
-
-    ---@param tbl table
-    ---@return table
-    function table.Shuffle( tbl )
-        length = #tbl
-        for i = length, 1, -1 do
-            index = math_random( 1, length )
-            tbl[ i ], tbl[ index ] = tbl[ index ], tbl[ i ]
-        end
-
-        return tbl
+---@param tbl table
+---@return table
+function table.Shuffle( tbl )
+    local length = #tbl
+    for i = length, 1, -1 do
+        local j = math_random( 1, length )
+        tbl[ i ], tbl[ j ] = tbl[ j ], tbl[ i ]
     end
 
-    local keys = setmetatable( {}, { ["__mode"] = "v" } )
+    return tbl
+end
 
-    ---@param tbl table
-    ---@return any, any
-    function table.Random( tbl )
-        length = 0
-        for key in pairs( tbl ) do
-            length = length + 1
-            keys[ length ] = key
-        end
+---@param tbl table
+---@return any, any
+function table.Random( tbl )
+    local count = 0
+    for _ in pairs( tbl ) do
+        count = count + 1
+    end
 
-        if length == 0 then
-            return nil, nil
-        end
+    local index = math_random( 1, count )
 
-        if length == 1 then
-            index = keys[ 1 ]
+    for key, value in pairs( tbl ) do
+        if index == 0 then
+            return value, key
         else
-            index = keys[ math_random( 1, length ) ]
+            index = index - 1
         end
-
-        return tbl[ index ], index
     end
-
 end
 
 do
