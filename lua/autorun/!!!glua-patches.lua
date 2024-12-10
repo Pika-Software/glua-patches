@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.4.3"
+local addon_name = "gLua Patches v1.5.0"
 
 local math, table = _G.math, _G.table
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -457,8 +457,8 @@ if CLIENT or MENU then
 end
 
 if CLIENT or SERVER then
-    local returnFalse = function() return false end
-    local returnTrue = function() return true end
+    local return_false = function() return false end
+    local return_true = function() return true end
     local timer_Simple = _G.timer.Simple
     local engine = _G.engine
 
@@ -869,22 +869,24 @@ if CLIENT or SERVER then
 
         hook_Add( "OnEntityCreated", addon_name .. " - Entity index cache", function( entity )
             local index = ENTITY_EntIndex( entity )
-            index2entity[ index ] = entity
             entity2index[ entity ] = index
+            index2entity[ index ] = entity
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
         hook_Add( "EntityRemoved", addon_name .. " - Entity index cache", function( entity )
             index2entity[ ENTITY_EntIndex( entity ) ] = nil
+
             timer_Simple( 0, function()
                 entity2index[ entity ] = nil
             end )
+
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
     end
 
-    -- Faster iterators
+    -- Faster player functions
     do
 
         local ents, player = _G.ents, _G.player
@@ -931,6 +933,17 @@ if CLIENT or SERVER then
             return inext, players, 0
         end
 
+        local PLAYER_IsBot = PLAYER.IsBot
+        local is_bot = {}
+
+        setmetatable( is_bot, {
+            __index = function( _, ply )
+                local value = PLAYER_IsBot( ply )
+                rawset( is_bot, ply, value )
+                return value
+            end
+        } )
+
         hook_Add( "OnEntityCreated", addon_name .. " - Faster iterator's", function( entity )
             -- shitty code protection
             for i = entity_count, 1, -1 do
@@ -939,11 +952,12 @@ if CLIENT or SERVER then
 
             if entity:IsPlayer() then
                 player_count = player_count + 1
-                players[ player_count ] = entity
+                rawset( players, player_count, entity )
+                rawset( is_bot, entity, PLAYER_IsBot( entity ) )
             end
 
             entity_count = entity_count + 1
-            entities[ entity_count ] = entity
+            rawset( entities, entity_count, entity )
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
@@ -964,52 +978,60 @@ if CLIENT or SERVER then
                         break
                     end
                 end
+
+                timer_Simple( 0, function()
+                    is_bot[ entity ] = nil
+                end )
             end
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
+        function PLAYER:IsBot()
+            return is_bot[ self ]
+        end
+
     end
 
-    ENTITY.IsPlayer = returnFalse
-    ENTITY.IsWeapon = returnFalse
-    ENTITY.IsNPC = returnFalse
-    ENTITY.IsNextbot = returnFalse
+    ENTITY.IsPlayer = return_false
+    ENTITY.IsWeapon = return_false
+    ENTITY.IsNPC = return_false
+    ENTITY.IsNextbot = return_false
 
-    PLAYER.IsWeapon = returnFalse
-    PLAYER.IsNPC = returnFalse
-    PLAYER.IsNextbot = returnFalse
-    PLAYER.IsPlayer = returnTrue
+    PLAYER.IsWeapon = return_false
+    PLAYER.IsNPC = return_false
+    PLAYER.IsNextbot = return_false
+    PLAYER.IsPlayer = return_true
 
     do
         local WEAPON = FindMetaTable( "Weapon" )
-        WEAPON.IsPlayer = returnFalse
-        WEAPON.IsWeapon = returnTrue
-        WEAPON.IsNPC = returnFalse
-        WEAPON.IsNextbot = returnFalse
+        WEAPON.IsPlayer = return_false
+        WEAPON.IsWeapon = return_true
+        WEAPON.IsNPC = return_false
+        WEAPON.IsNextbot = return_false
     end
 
     do
         local NPC = FindMetaTable( "NPC" )
-        NPC.IsPlayer = returnFalse
-        NPC.IsWeapon = returnFalse
-        NPC.IsNPC = returnTrue
-        NPC.IsNextbot = returnFalse
+        NPC.IsPlayer = return_false
+        NPC.IsWeapon = return_false
+        NPC.IsNPC = return_true
+        NPC.IsNextbot = return_false
     end
 
     do
         local PHYSOBJ = FindMetaTable( "PhysObj" )
-        PHYSOBJ.IsWeapon = returnFalse
-        PHYSOBJ.IsNPC = returnFalse
-        PHYSOBJ.IsNextbot = returnFalse
-        PHYSOBJ.IsPlayer = returnFalse
+        PHYSOBJ.IsWeapon = return_false
+        PHYSOBJ.IsNPC = return_false
+        PHYSOBJ.IsNextbot = return_false
+        PHYSOBJ.IsPlayer = return_false
     end
 
     do
         local NEXTBOT = FindMetaTable( "NextBot" )
-        NEXTBOT.IsPlayer = returnFalse
-        NEXTBOT.IsWeapon = returnFalse
-        NEXTBOT.IsNPC = returnFalse
-        NEXTBOT.IsNextbot = returnTrue
+        NEXTBOT.IsPlayer = return_false
+        NEXTBOT.IsWeapon = return_false
+        NEXTBOT.IsNPC = return_false
+        NEXTBOT.IsNextbot = return_true
     end
 
     -- Faster traces
@@ -1183,8 +1205,6 @@ if CLIENT or SERVER then
 
     end
 
-    local PLAYER_Alive = PLAYER.Alive
-
     -- Decals fix
     do
 
@@ -1195,7 +1215,7 @@ if CLIENT or SERVER then
             if data.health > 0 then return end
 
             local ply = Player( data.userid )
-            if not ( ply and ENTITY_IsValid( ply ) and PLAYER_Alive( ply ) ) then return end
+            if not ( ply and ENTITY_IsValid( ply ) and ply:Alive() ) then return end
 
             timer_Simple( 0.25, function()
                 if ENTITY_IsValid( ply ) then
@@ -1370,6 +1390,46 @@ if CLIENT or SERVER then
                 ENTITY_TakePhysicsDamage( entity, damageInfo )
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
+
+        end
+
+        -- Players alive cache
+        do
+
+            local PLAYER_Alive = PLAYER.Alive
+            local players = {}
+
+            setmetatable( players, {
+                __index = function( _, ply )
+                    return PLAYER_Alive( ply )
+                end
+            } )
+
+            hook_Add( "PlayerSpawn", addon_name .. " - Alive cache", function( ply )
+                players[ ply ] = true
+
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
+            hook_Add( "PostPlayerDeath", addon_name .. " - Alive cache", function( ply )
+                players[ ply ] = false
+
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
+            hook_Add( "EntityRemoved", addon_name .. " - Alive cache", function( entity )
+                if entity:IsPlayer() then
+                    timer_Simple( 0, function()
+                        players[ entity ] = nil
+                    end )
+                end
+
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
+            function PLAYER:Alive()
+                return players[ self ]
+            end
 
         end
 
