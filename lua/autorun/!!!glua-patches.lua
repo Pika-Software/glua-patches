@@ -6,12 +6,13 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.5.0"
+local addon_name = "gLua Patches v1.6.0"
 
-local math, table = _G.math, _G.table
+local math, table, engine = _G.math, _G.table, _G.engine
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
 local math_min, math_max, math_random = math.min, math.max, math.random
 local debug_getmetatable = _G.debug.getmetatable
+local engine_TickCount = engine.TickCount
 
 local MENU = _G.MENU_DLL == true
 local CLIENT = _G.CLIENT == true and not MENU
@@ -420,25 +421,39 @@ do
 
     end
 
-    local system_BatteryPower = system.BatteryPower
-    local system_HasFocus = system.HasFocus
+    local timer_Create = _G.timer.Create
 
-    local battery_power = system_BatteryPower()
-    local has_focus = system_HasFocus()
+    do
 
-    function system.BatteryPower()
-        return battery_power
+        local system_BatteryPower = system.BatteryPower
+        local battery_power = system_BatteryPower()
+
+        function system.BatteryPower()
+            return battery_power
+        end
+
+        timer_Create( addon_name .. " - system.BatteryPower", 1, 0, function()
+            battery_power = system_BatteryPower()
+            ---@diagnostic disable-next-line: redundant-parameter
+        end )
+
     end
 
-    function system.HasFocus()
-        return has_focus
-    end
+    do
 
-    _G.timer.Create( addon_name .. " - system.BatteryPower & system.HasFocus", 0.05, 0, function()
-        battery_power = system_BatteryPower()
-        has_focus = system_HasFocus()
-        ---@diagnostic disable-next-line: redundant-parameter
-    end )
+        local system_HasFocus = system.HasFocus
+        local has_focus = system_HasFocus()
+
+        function system.HasFocus()
+            return has_focus
+        end
+
+        timer_Create( addon_name .. " - system.HasFocus", 0.05, 0, function()
+            has_focus = system_HasFocus()
+            ---@diagnostic disable-next-line: redundant-parameter
+        end )
+
+    end
 
 end
 
@@ -456,11 +471,49 @@ if CLIENT or MENU then
 
 end
 
+do
+
+    local engine_GetAddons = engine.GetAddons
+
+    local lastTick = 0
+    local addons, length
+
+    ---@return table
+    function engine.GetAddons()
+        local tick = engine_TickCount()
+        if tick ~= lastTick then
+            addons = engine_GetAddons()
+            length = #addons
+            lastTick = tick
+        end
+
+        local lst = {}
+
+        for i = 1, length, 1 do
+            local data = addons[ i ]
+            lst[ i ] = {
+                downloaded = data.downloaded,
+                file = data.file,
+                models = data.models,
+                mounted = data.mounted,
+                size = data.size,
+                tags = data.tags,
+                timeadded = data.timeadded,
+                title = data.title,
+                updated = data.updated,
+                wsid = data.wsid
+           }
+        end
+
+        return lst
+    end
+
+end
+
 if CLIENT or SERVER then
     local return_false = function() return false end
     local return_true = function() return true end
     local timer_Simple = _G.timer.Simple
-    local engine = _G.engine
 
     ---@class Entity
     local ENTITY = FindMetaTable( "Entity" )
@@ -1037,7 +1090,6 @@ if CLIENT or SERVER then
     -- Faster traces
     do
 
-        local engine_TickCount = engine.TickCount
         local util = _G.util
 
         local TraceLine = util.TraceLine
