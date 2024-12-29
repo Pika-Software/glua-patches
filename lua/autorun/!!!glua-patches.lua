@@ -6,9 +6,9 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.6.0"
+local addon_name = "gLua Patches v1.7.0"
 
-local math, table, engine = _G.math, _G.table, _G.engine
+local string, math, table, engine = _G.string, _G.math, _G.table, _G.engine
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
 local math_min, math_max, math_random = math.min, math.max, math.random
 local debug_getmetatable = _G.debug.getmetatable
@@ -288,7 +288,6 @@ do
             debug_setmetatable( object, metatable )
         end
 
-        local string = _G.string
         local string_sub = string.sub
 
         function metatable:__index( key )
@@ -517,6 +516,7 @@ if CLIENT or SERVER then
 
     ---@class Entity
     local ENTITY = FindMetaTable( "Entity" )
+    local ENTITY_GetClass = ENTITY.GetClass
     local ENTITY_IsValid = ENTITY.IsValid
     local NULL = _G.NULL
 
@@ -912,6 +912,16 @@ if CLIENT or SERVER then
             entity2index[ world ] = 0
         end )
 
+        do
+
+            local string_format = string.format
+
+            function ENTITY:__tostring()
+                return string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() )
+            end
+
+        end
+
         function ENTITY:EntIndex()
             return entity2index[ self ]
         end
@@ -920,17 +930,37 @@ if CLIENT or SERVER then
             return index2entity[ index ]
         end
 
+        local entity2class = {}
+        setmetatable( entity2class, {
+            __index = function( _, entity )
+                return ENTITY_GetClass( entity )
+            end
+        } )
+
+        function ENTITY:GetClass()
+            return entity2class[ self ]
+        end
+
         hook_Add( "OnEntityCreated", addon_name .. " - Entity index cache", function( entity )
-            local index = ENTITY_EntIndex( entity )
-            entity2index[ entity ] = index
+            entity2class[ entity ] = ENTITY_GetClass( entity )
+
+            local index = entity2index[ entity ]
+            if index == -1 then
+                while rawget( index2entity, index ) ~= nil do
+                    index = index - 1
+                end
+            end
+
             index2entity[ index ] = entity
+            entity2index[ entity ] = index
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
         hook_Add( "EntityRemoved", addon_name .. " - Entity index cache", function( entity )
-            index2entity[ ENTITY_EntIndex( entity ) ] = nil
-
             timer_Simple( 0, function()
+                if ENTITY_IsValid( entity ) then return end
+                index2entity[ entity2index[ entity ] ] = nil
+                entity2class[ entity ] = nil
                 entity2index[ entity ] = nil
             end )
 
@@ -1280,8 +1310,6 @@ if CLIENT or SERVER then
     end
 
     -- TODO: usermessage.SendUserMessage
-
-    local ENTITY_GetClass = ENTITY.GetClass
 
     if SERVER then
         -- License check
