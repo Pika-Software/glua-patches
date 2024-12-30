@@ -6,12 +6,12 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.7.0"
+local addon_name = "gLua Patches v1.8.0"
 
-local string, math, table, engine = _G.string, _G.math, _G.table, _G.engine
+local debug, string, math, table, engine, game = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
 local math_min, math_max, math_random = math.min, math.max, math.random
-local debug_getmetatable = _G.debug.getmetatable
+local debug_getmetatable = debug.getmetatable
 local engine_TickCount = engine.TickCount
 
 local MENU = _G.MENU_DLL == true
@@ -255,7 +255,7 @@ end
 
 do
 
-    local debug_setmetatable = _G.debug.setmetatable
+    local debug_setmetatable = debug.setmetatable
 
     -- isnumber
     local isnumber
@@ -517,13 +517,11 @@ if CLIENT or SERVER then
     ---@class Entity
     local ENTITY = FindMetaTable( "Entity" )
     local ENTITY_GetClass = ENTITY.GetClass
-    local ENTITY_IsValid = ENTITY.IsValid
-    local NULL = _G.NULL
 
     ---@param value any
     ---@return boolean
     function _G.isentity( value )
-        if value == NULL then return true end
+        if not value then return false end
         local metatable = debug_getmetatable( value )
         if metatable == nil then return false end
         return metatable == ENTITY or metatable.MetaID == 9
@@ -800,13 +798,13 @@ if CLIENT or SERVER then
         do
 
             local LocalPlayer = _G.LocalPlayer
-            local player = NULL
+            local player = _G.NULL
 
             ---@return Player
             function _G.LocalPlayer()
-                if player == NULL then
+                if not player:IsValid() then
                     local entity = LocalPlayer()
-                    if entity and ENTITY_IsValid( entity ) then
+                    if entity and entity:IsValid() then
                         player = entity
                         return entity
                     end
@@ -885,31 +883,37 @@ if CLIENT or SERVER then
         local index2entity = {}
         setmetatable( index2entity, {
             __index = function( _, index )
-                local entity = Entity( index )
-                if entity == NULL then
-                    return entity
-                end
-
-                if ENTITY_IsValid( entity ) then
-                    rawset( index2entity, index, entity )
-                end
-
-                return entity
+                return Entity( index )
             end
         } )
 
         local entity2index = {}
         setmetatable( entity2index, {
             __index = function( _, entity )
-                return ENTITY_EntIndex( entity )
+                if entity:IsValid() then
+                    return ENTITY_EntIndex( entity )
+                else
+                    return 0
+                end
+            end
+        } )
+
+        local entity2class = {}
+        setmetatable( entity2class, {
+            __index = function( _, entity )
+                if entity:IsValid() then
+                    return ENTITY_GetClass( entity )
+                else
+                    error( "Tried to get class of invalid entity!", 3 )
+                end
             end
         } )
 
         -- World entity support
         hook_Add( "InitPostEntity", addon_name .. " - Entity index cache", function()
             local world = game.GetWorld()
-            index2entity[ 0 ] = world
-            entity2index[ world ] = 0
+            rawset( index2entity, 0, world)
+            rawset( entity2index, world, 0 )
         end )
 
         do
@@ -917,7 +921,7 @@ if CLIENT or SERVER then
             local string_format = string.format
 
             function ENTITY:__tostring()
-                return string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() )
+                return self:IsValid() and string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() ) or "[NULL Entity]"
             end
 
         end
@@ -926,23 +930,22 @@ if CLIENT or SERVER then
             return entity2index[ self ]
         end
 
+        local valid_entities = {}
+
+        function ENTITY:IsValid()
+            return rawget( valid_entities, self ) == true
+        end
+
         function _G.Entity( index )
             return index2entity[ index ]
         end
-
-        local entity2class = {}
-        setmetatable( entity2class, {
-            __index = function( _, entity )
-                return ENTITY_GetClass( entity )
-            end
-        } )
 
         function ENTITY:GetClass()
             return entity2class[ self ]
         end
 
-        hook_Add( "OnEntityCreated", addon_name .. " - Entity index cache", function( entity )
-            entity2class[ entity ] = ENTITY_GetClass( entity )
+        hook_Add( "OnEntityCreated", addon_name .. " - Entity cache", function( entity )
+            rawset( valid_entities, entity, true )
 
             local index = entity2index[ entity ]
             if index == -1 then
@@ -951,17 +954,19 @@ if CLIENT or SERVER then
                 end
             end
 
-            index2entity[ index ] = entity
-            entity2index[ entity ] = index
+            rawset( index2entity, index, entity )
+            rawset( entity2index, entity, index )
+            rawset( entity2class, entity, ENTITY_GetClass( entity ) )
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
-        hook_Add( "EntityRemoved", addon_name .. " - Entity index cache", function( entity )
+        hook_Add( "EntityRemoved", addon_name .. " - Entity cache", function( entity )
+            rawset( valid_entities, entity, nil )
+
             timer_Simple( 0, function()
-                if ENTITY_IsValid( entity ) then return end
-                index2entity[ entity2index[ entity ] ] = nil
-                entity2class[ entity ] = nil
-                entity2index[ entity ] = nil
+                rawset( index2entity, entity2index[ entity ], nil )
+                rawset( entity2class, entity, nil )
+                rawset( entity2index, entity, nil )
             end )
 
             ---@diagnostic disable-next-line: redundant-parameter
@@ -1297,10 +1302,10 @@ if CLIENT or SERVER then
             if data.health > 0 then return end
 
             local ply = Player( data.userid )
-            if not ( ply and ENTITY_IsValid( ply ) and ply:Alive() ) then return end
+            if not ( ply and ply:IsValid() and ply:Alive() ) then return end
 
             timer_Simple( 0.25, function()
-                if ENTITY_IsValid( ply ) then
+                if ply:IsValid() then
                     ply:RemoveAllDecals()
                 end
             end )
@@ -1450,7 +1455,7 @@ if CLIENT or SERVER then
                     local entity = entities[ index ]
                     entities[ index ] = nil
 
-                    if ENTITY_IsValid( entity ) and not ENTITY_GetInternalVariable( entity, "m_bExitAnimOn" ) then
+                    if entity:IsValid() and not ENTITY_GetInternalVariable( entity, "m_bExitAnimOn" ) then
                         entity:AddEFlags( EFL_NO_THINK_FUNCTION )
                     end
                 end
@@ -1518,5 +1523,5 @@ if CLIENT or SERVER then
 end
 
 MsgC( SERVER and Color( 50, 100, 250 ) or Color( 250, 100, 50 ), "[" .. addon_name .. "] ", _G.color_white, table.Random( {
-    "Here For You ♪", "Patched", "Alright", "Thanks for installation <3"
+    "Here For You ♪", "Patched", "Alright", "Thanks for installation <3", "Increasing performance.."
 } ) .. "\n" )
