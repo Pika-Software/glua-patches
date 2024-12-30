@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.8.0"
+local addon_name = "gLua Patches v1.8.1"
 
 local debug, string, math, table, engine, game = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -805,6 +805,10 @@ if CLIENT or SERVER then
                 if not player:IsValid() then
                     local entity = LocalPlayer()
                     if entity and entity:IsValid() then
+                        function _G.LocalPlayer()
+                            return entity
+                        end
+
                         player = entity
                         return entity
                     end
@@ -932,8 +936,17 @@ if CLIENT or SERVER then
 
         local valid_entities = {}
 
+        do
+            local ENTITY_IsValid = ENTITY.IsValid
+            setmetatable( valid_entities, {
+                __index = function( _, entity )
+                    return ENTITY_IsValid( entity )
+                end
+            } )
+        end
+
         function ENTITY:IsValid()
-            return rawget( valid_entities, self ) == true
+            return valid_entities[ self ]
         end
 
         function _G.Entity( index )
