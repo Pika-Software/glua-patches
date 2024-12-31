@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.8.1"
+local addon_name = "gLua Patches v1.9.0"
 
 local debug, string, math, table, engine, game = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -517,6 +517,7 @@ if CLIENT or SERVER then
     ---@class Entity
     local ENTITY = FindMetaTable( "Entity" )
     local ENTITY_GetClass = ENTITY.GetClass
+    local ENTITY_IsValid = ENTITY.IsValid
 
     ---@param value any
     ---@return boolean
@@ -802,9 +803,9 @@ if CLIENT or SERVER then
 
             ---@return Player
             function _G.LocalPlayer()
-                if not player:IsValid() then
+                if not ENTITY_IsValid( player ) then
                     local entity = LocalPlayer()
-                    if entity and entity:IsValid() then
+                    if entity and ENTITY_IsValid( entity ) then
                         function _G.LocalPlayer()
                             return entity
                         end
@@ -894,7 +895,7 @@ if CLIENT or SERVER then
         local entity2index = {}
         setmetatable( entity2index, {
             __index = function( _, entity )
-                if entity:IsValid() then
+                if ENTITY_IsValid( entity ) then
                     return ENTITY_EntIndex( entity )
                 else
                     return 0
@@ -905,7 +906,7 @@ if CLIENT or SERVER then
         local entity2class = {}
         setmetatable( entity2class, {
             __index = function( _, entity )
-                if entity:IsValid() then
+                if ENTITY_IsValid( entity ) then
                     return ENTITY_GetClass( entity )
                 else
                     error( "Tried to get class of invalid entity!", 3 )
@@ -925,28 +926,13 @@ if CLIENT or SERVER then
             local string_format = string.format
 
             function ENTITY:__tostring()
-                return self:IsValid() and string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() ) or "[NULL Entity]"
+                return ENTITY_IsValid( self ) and string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() ) or "[NULL Entity]"
             end
 
         end
 
         function ENTITY:EntIndex()
             return entity2index[ self ]
-        end
-
-        local valid_entities = {}
-
-        do
-            local ENTITY_IsValid = ENTITY.IsValid
-            setmetatable( valid_entities, {
-                __index = function( _, entity )
-                    return ENTITY_IsValid( entity )
-                end
-            } )
-        end
-
-        function ENTITY:IsValid()
-            return valid_entities[ self ]
         end
 
         function _G.Entity( index )
@@ -958,8 +944,6 @@ if CLIENT or SERVER then
         end
 
         hook_Add( "OnEntityCreated", addon_name .. " - Entity cache", function( entity )
-            rawset( valid_entities, entity, true )
-
             local index = entity2index[ entity ]
             if index == -1 then
                 while rawget( index2entity, index ) ~= nil do
@@ -974,9 +958,8 @@ if CLIENT or SERVER then
         end, PRE_HOOK )
 
         hook_Add( "EntityRemoved", addon_name .. " - Entity cache", function( entity )
-            rawset( valid_entities, entity, nil )
-
             timer_Simple( 0, function()
+                if ENTITY_IsValid( entity ) then return end
                 rawset( index2entity, entity2index[ entity ], nil )
                 rawset( entity2class, entity, nil )
                 rawset( entity2index, entity, nil )
@@ -1315,10 +1298,10 @@ if CLIENT or SERVER then
             if data.health > 0 then return end
 
             local ply = Player( data.userid )
-            if not ( ply and ply:IsValid() and ply:Alive() ) then return end
+            if not ( ply and ENTITY_IsValid( ply ) and ply:Alive() ) then return end
 
             timer_Simple( 0.25, function()
-                if ply:IsValid() then
+                if ENTITY_IsValid( ply ) then
                     ply:RemoveAllDecals()
                 end
             end )
@@ -1468,7 +1451,7 @@ if CLIENT or SERVER then
                     local entity = entities[ index ]
                     entities[ index ] = nil
 
-                    if entity:IsValid() and not ENTITY_GetInternalVariable( entity, "m_bExitAnimOn" ) then
+                    if ENTITY_IsValid( entity ) and not ENTITY_GetInternalVariable( entity, "m_bExitAnimOn" ) then
                         entity:AddEFlags( EFL_NO_THINK_FUNCTION )
                     end
                 end
