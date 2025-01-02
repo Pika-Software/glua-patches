@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.9.0"
+local addon_name = "gLua Patches v1.10.0"
 
 local debug, string, math, table, engine, game = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -908,6 +908,8 @@ if CLIENT or SERVER then
             __index = function( _, entity )
                 if ENTITY_IsValid( entity ) then
                     return ENTITY_GetClass( entity )
+                elseif entity:IsWorld() then
+                    return "worldspawn"
                 else
                     error( "Tried to get class of invalid entity!", 3 )
                 end
@@ -917,16 +919,24 @@ if CLIENT or SERVER then
         -- World entity support
         hook_Add( "InitPostEntity", addon_name .. " - Entity index cache", function()
             local world = game.GetWorld()
-            rawset( index2entity, 0, world)
+            rawset( index2entity, 0, world )
             rawset( entity2index, world, 0 )
         end )
+
+        function ENTITY:IsWorld()
+            return index2entity[ 0 ] == self
+        end
+
+        function game.GetWorld()
+            return index2entity[ 0 ]
+        end
 
         do
 
             local string_format = string.format
 
             function ENTITY:__tostring()
-                return ENTITY_IsValid( self ) and string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() ) or "[NULL Entity]"
+                return ( ENTITY_IsValid( self ) or self:IsWorld() ) and string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() ) or "[NULL Entity]"
             end
 
         end
