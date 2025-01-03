@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.10.0"
+local addon_name = "gLua Patches v1.11.0"
 
 local debug, string, math, table, engine, game = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -438,19 +438,62 @@ do
 
     end
 
+    -- system focus tricks
     do
 
         local system_HasFocus = system.HasFocus
         local has_focus = system_HasFocus()
+        local focus_changed
 
         function system.HasFocus()
             return has_focus
         end
 
         timer_Create( addon_name .. " - system.HasFocus", 0.05, 0, function()
-            has_focus = system_HasFocus()
+            if system_HasFocus() == has_focus then return end
+            has_focus = not has_focus
+
+            if focus_changed == nil then return end
+            focus_changed()
+
             ---@diagnostic disable-next-line: redundant-parameter
         end )
+
+        if CLIENT then
+
+            -- No more mouse lock
+            do
+
+                local gp_no_more_mouse_lock = _G.CreateConVar( "gp_no_more_mouse_lock", "1", FCVAR_ARCHIVE, "Automatically open the pause menu when the game loses focus." )
+                local gui_IsGameUIVisible, gui_ActivateGameUI = gui.IsGameUIVisible, gui.ActivateGameUI
+                local vgui_CursorVisible = vgui.CursorVisible
+
+                function focus_changed()
+                    if has_focus or not ( gp_no_more_mouse_lock and gp_no_more_mouse_lock:GetBool() ) or vgui_CursorVisible() or gui_IsGameUIVisible() then return end
+                    gui_ActivateGameUI()
+                end
+
+            end
+
+            -- No more fake attacks
+            do
+
+                local last_no_focus_time = 0
+
+                hook_Add( "CreateMove", addon_name .. " - No more fake attacks", function( cmd )
+                    if ( CurTime() - last_no_focus_time ) < 0.25 then
+                        cmd:RemoveKey( 1 )
+                        cmd:RemoveKey( 2048 )
+                    end
+
+                    if has_focus then return end
+                    last_no_focus_time = CurTime()
+                    ---@diagnostic disable-next-line: redundant-parameter
+                end, PRE_HOOK )
+
+            end
+
+        end
 
     end
 
@@ -799,71 +842,24 @@ if CLIENT or SERVER then
         do
 
             local LocalPlayer = _G.LocalPlayer
-            local player = _G.NULL
+            local NULL = _G.NULL
+            local player
 
             ---@return Player
             function _G.LocalPlayer()
-                if not ENTITY_IsValid( player ) then
+                if player == nil then
                     local entity = LocalPlayer()
                     if entity and ENTITY_IsValid( entity ) then
-                        function _G.LocalPlayer()
-                            return entity
-                        end
-
+                        rawset( _G, "LocalPlayer", function() return entity end )
                         player = entity
                         return entity
+                    else
+                        return NULL
                     end
+                else
+                    return player
                 end
-
-                return player
             end
-
-        end
-
-        do
-
-            local HasFocus = _G.system.HasFocus
-
-            -- No more fake attacks
-            do
-
-                local IN_ATTACK, IN_ATTACK2 = _G.IN_ATTACK, _G.IN_ATTACK2
-                local lastNoFocusTime = 0
-
-                hook_Add( "CreateMove", addon_name .. " - No more fake attacks", function( cmd )
-                    if ( CurTime() - lastNoFocusTime ) < 0.25 then
-                        cmd:RemoveKey( IN_ATTACK )
-                        cmd:RemoveKey( IN_ATTACK2 )
-                    end
-
-                    if HasFocus() then return end
-                    lastNoFocusTime = CurTime()
-                    ---@diagnostic disable-next-line: redundant-parameter
-                end, PRE_HOOK )
-
-            end
-
-            -- No more mouse lock
-            local gui_IsGameUIVisible, gui_ActivateGameUI = gui.IsGameUIVisible, gui.ActivateGameUI
-            local vgui_CursorVisible = vgui.CursorVisible
-            local ui_state = false
-
-            hook_Add( "Think", addon_name .. " - No more mouse lock", function()
-                if HasFocus() then
-                    if ui_state then
-                        ui_state = false
-                    end
-                elseif not ui_state then
-                    if vgui_CursorVisible() then return end
-
-                    if not gui_IsGameUIVisible() then
-                        gui_ActivateGameUI()
-                    end
-
-                    ui_state = true
-                end
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
 
         end
 
@@ -1320,9 +1316,14 @@ if CLIENT or SERVER then
 
     end
 
-    -- TODO: usermessage.SendUserMessage
-
     if SERVER then
+
+        -- Level reload command
+        _G.concommand.Add( "reloadlevel", function( ply )
+            if ply and not ( ply:IsSuperAdmin() or ply:IsListenServerHost() ) then return end
+            RunConsoleCommand( "changelevel", game.GetMap() )
+        end, nil, "Reload the current server map and reconnect all players." )
+
         -- License check
         do
 
@@ -1529,5 +1530,5 @@ if CLIENT or SERVER then
 end
 
 MsgC( SERVER and Color( 50, 100, 250 ) or Color( 250, 100, 50 ), "[" .. addon_name .. "] ", _G.color_white, table.Random( {
-    "Here For You ♪", "Patched", "Alright", "Thanks for installation <3", "Increasing performance.."
+    "Here For You ♪", "Patched", "Alright", "Thanks for installation <3", "Increasing performance!", "Sometimes we just need more cache :>"
 } ) .. "\n" )
