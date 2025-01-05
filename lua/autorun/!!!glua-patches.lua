@@ -6,9 +6,9 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.11.0"
+local addon_name = "gLua Patches v1.12.0"
 
-local debug, string, math, table, engine, game = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game
+local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
 local math_min, math_max, math_random = math.min, math.max, math.random
 local debug_getmetatable = debug.getmetatable
@@ -552,9 +552,36 @@ do
 
 end
 
+do
+
+    local string_match = string.match
+
+    --- Convert SteamID to SteamID64.
+    ---@param str string: SteamID
+    ---@return string: SteamID64
+    function util.SteamIDTo64( str )
+        local x, y, z = string_match( str, "STEAM_([0-5]):([01]):(%d+)" )
+        return x == nil and "0" or ( "765" .. ( ( tonumber( z, 10 ) * 2 ) + 61197960265728 ) + ( y == "1" and 1 or 0 ) )
+    end
+
+end
+
+do
+
+    local math_floor = math.floor
+    local string_sub = string.sub
+
+    --- Convert SteamID64 to SteamID.
+    ---@param str string: SteamID64
+    ---@return string: SteamID
+    function util.SteamIDFrom64( str )
+        local account_id = math_max( 0, ( tonumber( string_sub( str, 4 ), 10 ) or 0 ) - 61197960265728 )
+        return "STEAM_0:" .. ( account_id % 2 == 0 and "0" or "1" ) .. ":" .. math_floor( account_id * 0.5 )
+    end
+
+end
+
 if CLIENT or SERVER then
-    local return_false = function() return false end
-    local return_true = function() return true end
     local timer_Simple = _G.timer.Simple
 
     ---@class Entity
@@ -879,7 +906,51 @@ if CLIENT or SERVER then
     do
 
         local ENTITY_EntIndex = ENTITY.EntIndex
+        local ents, player = _G.ents, _G.player
+        local table_remove = table.remove
         local Entity = _G.Entity
+
+        local inext = ipairs( ents )
+
+        local entities = ents.GetAll()
+        local entity_count = #entities
+
+        function ents.GetAll()
+            local copy = {}
+            for index = 1, entity_count do
+                rawset( copy, index, rawget( entities, index ) )
+            end
+
+            return copy
+        end
+
+        function ents.GetCount()
+            return entity_count
+        end
+
+        function ents.Iterator()
+            return inext, entities, 0
+        end
+
+        local players = player.GetAll()
+        local player_count = #players
+
+        function player.GetAll()
+            local copy = {}
+            for index = 1, player_count do
+                rawset( copy, index, rawget( players, index ) )
+            end
+
+            return copy
+        end
+
+        function player.GetCount()
+            return player_count
+        end
+
+        function player.Iterator()
+            return inext, players, 0
+        end
 
         local index2entity = {}
         setmetatable( index2entity, {
@@ -949,7 +1020,79 @@ if CLIENT or SERVER then
             return entity2class[ self ]
         end
 
-        hook_Add( "OnEntityCreated", addon_name .. " - Entity cache", function( entity )
+        local player2is_bot = {}
+
+        do
+
+            local PLAYER_IsBot = PLAYER.IsBot
+
+            setmetatable( player2is_bot, {
+                __index = function( _, ply )
+                    local value = PLAYER_IsBot( ply )
+                    rawset( player2is_bot, ply, value )
+                    return value
+                end
+            } )
+
+        end
+
+        function PLAYER:IsBot()
+            return player2is_bot[ self ]
+        end
+
+        local player2steamid = {}
+
+        do
+
+            local PLAYER_SteamID = PLAYER.SteamID
+
+            setmetatable( player2steamid, {
+                __index = function( _, ply )
+                    if ply:IsBot() then
+                        -- TODO:
+                        return nil
+                    else
+                        local value = PLAYER_SteamID( ply )
+                        rawset( player2steamid, ply, value )
+                        return value
+                    end
+                end
+            } )
+
+        end
+
+        function PLAYER:SteamID()
+            return player2steamid[ self ]
+        end
+
+        local player2steamid64 = {}
+
+        do
+
+            local PLAYER_SteamID64 = PLAYER.SteamID64
+
+            setmetatable( player2steamid64, {
+                __index = function( _, ply )
+                    if ply:IsBot() then
+                        -- TODO:
+                        return nil
+                    else
+                        local value = PLAYER_SteamID64( ply )
+                        rawset( player2steamid64, ply, value )
+                        return value
+                    end
+                end
+            } )
+
+        end
+
+        function PLAYER:SteamID64()
+            return player2steamid64[ self ]
+        end
+
+        hook_Add( "OnEntityCreated", addon_name .. " - Entity & player cache", function( entity )
+            if rawget( entity2index, entity ) ~= nil then return end
+
             local index = entity2index[ entity ]
             if index == -1 then
                 while rawget( index2entity, index ) ~= nil do
@@ -960,174 +1103,104 @@ if CLIENT or SERVER then
             rawset( index2entity, index, entity )
             rawset( entity2index, entity, index )
             rawset( entity2class, entity, ENTITY_GetClass( entity ) )
-            ---@diagnostic disable-next-line: redundant-parameter
-        end, PRE_HOOK )
 
-        hook_Add( "EntityRemoved", addon_name .. " - Entity cache", function( entity )
-            timer_Simple( 0, function()
-                if ENTITY_IsValid( entity ) then return end
-                rawset( index2entity, entity2index[ entity ], nil )
-                rawset( entity2class, entity, nil )
-                rawset( entity2index, entity, nil )
-            end )
-
-            ---@diagnostic disable-next-line: redundant-parameter
-        end, PRE_HOOK )
-
-    end
-
-    -- Faster player functions
-    do
-
-        local ents, player = _G.ents, _G.player
-        local table_remove = table.remove
-        local inext = ipairs( ents )
-
-        local entities = ents.GetAll()
-        local entity_count = #entities
-
-        function ents.GetAll()
-            local copy = {}
-            for i = 1, entity_count do
-                rawset( copy, i, rawget( entities, i ) )
-            end
-
-            return copy
-        end
-
-        function ents.GetCount()
-            return entity_count
-        end
-
-        function ents.Iterator()
-            return inext, entities, 0
-        end
-
-        local players = player.GetAll()
-        local player_count = #players
-
-        function player.GetAll()
-            local copy = {}
-            for i = 1, player_count do
-                rawset( copy, i, rawget( players, i ) )
-            end
-
-            return copy
-        end
-
-        function player.GetCount()
-            return player_count
-        end
-
-        function player.Iterator()
-            return inext, players, 0
-        end
-
-        local PLAYER_IsBot = PLAYER.IsBot
-        local is_bot = {}
-
-        setmetatable( is_bot, {
-            __index = function( _, ply )
-                local value = PLAYER_IsBot( ply )
-                rawset( is_bot, ply, value )
-                return value
-            end
-        } )
-
-        hook_Add( "OnEntityCreated", addon_name .. " - Faster iterator's", function( entity )
-            -- shitty code protection
-            for i = entity_count, 1, -1 do
-                if entities[ i ] == entity then return end
-            end
+            entity_count = entity_count + 1
+            rawset( entities, entity_count, entity )
 
             if entity:IsPlayer() then
                 player_count = player_count + 1
                 rawset( players, player_count, entity )
-                rawset( is_bot, entity, PLAYER_IsBot( entity ) )
             end
 
-            entity_count = entity_count + 1
-            rawset( entities, entity_count, entity )
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
-        hook_Add( "EntityRemoved", addon_name .. " - Faster iterator's", function( entity )
-            for i = entity_count, 1, -1 do
-                if entities[ i ] == entity then
+        local on_remove = {}
+
+        hook_Add( "EntityRemoved", addon_name .. " - Entity & player cache", function( entity )
+            if rawget( entity2index, entity ) == nil or rawget( on_remove, entity ) then return end
+            rawset( on_remove, entity, true )
+
+            timer_Simple( 0, function()
+                rawset( index2entity, entity2index[ entity ], nil )
+                rawset( entity2class, entity, nil )
+                rawset( entity2index, entity, nil )
+                rawset( on_remove, entity, nil )
+
+                if ENTITY_IsValid( entity ) then
+                    if entity:IsPlayer() then
+                        entity:Kick( "Player was removed." )
+                    else
+                        entity:Remove()
+                    end
+                end
+            end )
+
+            for index = entity_count, 1, -1 do
+                if entities[ index ] == entity then
                     entity_count = entity_count - 1
-                    table_remove( entities, i )
+                    table_remove( entities, index )
                     break
                 end
             end
 
             if entity:IsPlayer() then
-                for i = player_count, 1, -1 do
-                    if players[ i ] == entity then
+                timer_Simple( 0, function()
+                    rawset( player2is_bot, entity, nil )
+                    rawset( player2steamid, entity, nil )
+                    rawset( player2steamid64, entity, nil )
+                end )
+
+                for index = player_count, 1, -1 do
+                    if players[ index ] == entity then
                         player_count = player_count - 1
-                        table_remove( players, i )
+                        table_remove( players, index )
                         break
                     end
                 end
-
-                timer_Simple( 0, function()
-                    is_bot[ entity ] = nil
-                end )
             end
+
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
-        function PLAYER:IsBot()
-            return is_bot[ self ]
+    end
+
+    function ENTITY:IsPlayer()
+        return debug_getmetatable( self ) == PLAYER
+    end
+
+    do
+
+        local WEAPON = FindMetaTable( "Weapon" )
+
+        function ENTITY:IsWeapon()
+            return debug_getmetatable( self ) == WEAPON
         end
 
     end
 
-    ENTITY.IsPlayer = return_false
-    ENTITY.IsWeapon = return_false
-    ENTITY.IsNPC = return_false
-    ENTITY.IsNextbot = return_false
-
-    PLAYER.IsWeapon = return_false
-    PLAYER.IsNPC = return_false
-    PLAYER.IsNextbot = return_false
-    PLAYER.IsPlayer = return_true
-
     do
-        local WEAPON = FindMetaTable( "Weapon" )
-        WEAPON.IsPlayer = return_false
-        WEAPON.IsWeapon = return_true
-        WEAPON.IsNPC = return_false
-        WEAPON.IsNextbot = return_false
-    end
 
-    do
         local NPC = FindMetaTable( "NPC" )
-        NPC.IsPlayer = return_false
-        NPC.IsWeapon = return_false
-        NPC.IsNPC = return_true
-        NPC.IsNextbot = return_false
+
+        function ENTITY:IsNPC()
+            return debug_getmetatable( self ) == NPC
+        end
+
     end
 
     do
-        local PHYSOBJ = FindMetaTable( "PhysObj" )
-        PHYSOBJ.IsWeapon = return_false
-        PHYSOBJ.IsNPC = return_false
-        PHYSOBJ.IsNextbot = return_false
-        PHYSOBJ.IsPlayer = return_false
-    end
 
-    do
         local NEXTBOT = FindMetaTable( "NextBot" )
-        NEXTBOT.IsPlayer = return_false
-        NEXTBOT.IsWeapon = return_false
-        NEXTBOT.IsNPC = return_false
-        NEXTBOT.IsNextbot = return_true
+
+        function ENTITY:IsNextbot()
+            return debug_getmetatable( self ) == NEXTBOT
+        end
+
     end
 
     -- Faster traces
     do
-
-        local util = _G.util
 
         local TraceLine = util.TraceLine
         local distance = 4096 * 8
@@ -1423,6 +1496,7 @@ if CLIENT or SERVER then
                 if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
                     entity:AddEFlags( EFL_NO_THINK_FUNCTION )
                 end
+
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
@@ -1430,6 +1504,7 @@ if CLIENT or SERVER then
                 if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
                     entities[ #entities + 1 ] = entity
                 end
+
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
