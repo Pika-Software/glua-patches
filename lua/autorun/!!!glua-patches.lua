@@ -6,11 +6,12 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.12.0"
+local addon_name = "gLua Patches v1.13.0"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
-local math_min, math_max, math_random = math.min, math.max, math.random
+local gameevent_Listen = ( gameevent ~= nil and isfunction( gameevent.Listen ) ) and gameevent.Listen
+local math_min, math_max, math_random, math_floor = math.min, math.max, math.random, math.floor
 local debug_getmetatable = debug.getmetatable
 local engine_TickCount = engine.TickCount
 
@@ -48,22 +49,16 @@ function math.Clamp( value, min, max )
     return math_min( math_max( value, min ), max )
 end
 
-do
-
-    local math_floor = math.floor
-
-    ---@param value number
-    ---@param decimals number
-    ---@return number
-    function math.Round( value, decimals )
-        if decimals then
-            local mult = 10 ^ decimals
-            return math_floor( value * mult + 0.5 ) / mult
-        else
-            return math_floor( value + 0.5 )
-        end
+---@param value number
+---@param decimals number
+---@return number
+function math.Round( value, decimals )
+    if decimals then
+        local mult = 10 ^ decimals
+        return math_floor( value * mult + 0.5 ) / mult
+    else
+        return math_floor( value + 0.5 )
     end
-
 end
 
 ---@param tbl table
@@ -568,7 +563,6 @@ end
 
 do
 
-    local math_floor = math.floor
     local string_sub = string.sub
 
     --- Convert SteamID64 to SteamID.
@@ -586,7 +580,6 @@ if CLIENT or SERVER then
 
     ---@class Entity
     local ENTITY = FindMetaTable( "Entity" )
-    local ENTITY_GetClass = ENTITY.GetClass
     local ENTITY_IsValid = ENTITY.IsValid
 
     ---@param value any
@@ -828,10 +821,10 @@ if CLIENT or SERVER then
         end
 
         -- OnConVarChanged for replicated cvars
-        do
+        if gameevent_Listen ~= nil then
 
             local CONVAR_GetDefault = CONVAR.GetDefault
-            _G.gameevent.Listen( "server_cvar" )
+            gameevent_Listen( "server_cvar" )
             local old_values = {}
 
             hook_Add( "server_cvar", addon_name .. " - OnConVarChanged for replicated cvars", function( data )
@@ -905,10 +898,8 @@ if CLIENT or SERVER then
     -- Entity index cache
     do
 
-        local ENTITY_EntIndex = ENTITY.EntIndex
         local ents, player = _G.ents, _G.player
         local table_remove = table.remove
-        local Entity = _G.Entity
 
         local inext = ipairs( ents )
 
@@ -953,58 +944,45 @@ if CLIENT or SERVER then
         end
 
         local index2entity = {}
-        setmetatable( index2entity, {
-            __index = function( _, index )
-                return Entity( index )
-            end
-        } )
+        do
 
-        local entity2index = {}
-        setmetatable( entity2index, {
-            __index = function( _, entity )
-                if ENTITY_IsValid( entity ) then
-                    return ENTITY_EntIndex( entity )
-                else
-                    return 0
+            local game_GetWorld = game.GetWorld
+            local Entity = _G.Entity
+
+            setmetatable( index2entity, {
+                __index = function( _, index )
+                    if index == 0 then
+                        return game_GetWorld()
+                    else
+                        return Entity( index )
+                    end
                 end
-            end
-        } )
+            } )
 
-        local entity2class = {}
-        setmetatable( entity2class, {
-            __index = function( _, entity )
-                if ENTITY_IsValid( entity ) then
-                    return ENTITY_GetClass( entity )
-                elseif entity:IsWorld() then
-                    return "worldspawn"
-                else
-                    error( "Tried to get class of invalid entity!", 3 )
-                end
-            end
-        } )
+        end
 
-        -- World entity support
-        hook_Add( "InitPostEntity", addon_name .. " - Entity index cache", function()
-            local world = game.GetWorld()
-            rawset( index2entity, 0, world )
-            rawset( entity2index, world, 0 )
-        end )
-
-        function ENTITY:IsWorld()
-            return index2entity[ 0 ] == self
+        function _G.Entity( index )
+            return index2entity[ index ]
         end
 
         function game.GetWorld()
             return index2entity[ 0 ]
         end
 
+        local entity2index = {}
         do
 
-            local string_format = string.format
+            local ENTITY_EntIndex = ENTITY.EntIndex
 
-            function ENTITY:__tostring()
-                return ( ENTITY_IsValid( self ) or self:IsWorld() ) and string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() ) or "[NULL Entity]"
-            end
+            setmetatable( entity2index, {
+                __index = function( _, entity )
+                    if ENTITY_IsValid( entity ) then
+                        return ENTITY_EntIndex( entity )
+                    else
+                        return 0
+                    end
+                end
+            } )
 
         end
 
@@ -1012,27 +990,144 @@ if CLIENT or SERVER then
             return entity2index[ self ]
         end
 
-        function _G.Entity( index )
-            return index2entity[ index ]
+        local entity2class = {}
+        do
+
+            local ENTITY_GetClass = ENTITY.GetClass
+
+            setmetatable( entity2class, {
+                __index = function( _, entity )
+                    if ENTITY_IsValid( entity ) then
+                        return ENTITY_GetClass( entity )
+                    elseif entity:IsWorld() then
+                        return "worldspawn"
+                    else
+                        error( "Tried to get class of invalid entity!", 3 )
+                    end
+                end
+            } )
+
         end
 
         function ENTITY:GetClass()
             return entity2class[ self ]
         end
 
-        local player2is_bot = {}
+        -- World entity
+        hook_Add( "InitPostEntity", addon_name .. " - World creation", function()
+            local entity = index2entity[ 0 ]
+            if rawget( entity2index, entity ) == nil then
+                rawset( index2entity, 0, entity )
+                rawset( entity2index, entity, 0 )
+                rawset( entity2class, entity, "worldspawn" )
+                table.insert( entities, 1, entity )
+                entity_count = entity_count + 1
+            end
 
+            ---@diagnostic disable-next-line: redundant-parameter
+        end, PRE_HOOK )
+
+        function ENTITY:IsWorld()
+            return index2entity[ 0 ] == self
+        end
+
+        -- tostring functions
+        do
+
+            local string_format = string.format
+
+            ---@private
+            function ENTITY:__tostring()
+                if ENTITY_IsValid( self ) then
+                    return string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() )
+                elseif self:IsWorld() then
+                    return "Entity [0][worldspawn]"
+                else
+                    return "[NULL Entity]"
+                end
+            end
+
+            ---@private
+            function PLAYER:__tostring()
+                if ENTITY_IsValid( self ) then
+                    return string_format( "Player [%d][%s]", self:EntIndex(), self:Nick() )
+                else
+                    return "[NULL Player]"
+                end
+            end
+
+        end
+
+        local uid2player = {}
+        do
+
+            local Player = _G.Player
+
+            setmetatable( uid2player, {
+                __index = function( _, index )
+                    return Player( index )
+                end
+            } )
+
+        end
+
+        local player2uid = {}
+        do
+
+            local PLAYER_UserID = PLAYER.UserID
+
+            setmetatable( player2uid, {
+                __index = function( _, ply )
+                    return PLAYER_UserID( ply )
+                end
+            } )
+
+        end
+
+        function PLAYER:UserID()
+            return player2uid[ self ]
+        end
+
+        local player2is_bot = {}
         do
 
             local PLAYER_IsBot = PLAYER.IsBot
 
-            setmetatable( player2is_bot, {
-                __index = function( _, ply )
-                    local value = PLAYER_IsBot( ply )
-                    rawset( player2is_bot, ply, value )
-                    return value
-                end
-            } )
+            if SERVER then
+
+                local connected_players = {}
+
+                hook_Add( "PlayerInitialSpawn", addon_name .. " - Player is bot cache", function( ply )
+                    connected_players[ ply ] = true
+                    ---@diagnostic disable-next-line: redundant-parameter
+                end, PRE_HOOK )
+
+                hook_Add( "PlayerDisconnected", addon_name .. " - Player is bot cache", function( ply )
+                    connected_players[ ply ] = nil
+                    ---@diagnostic disable-next-line: redundant-parameter
+                end, PRE_HOOK )
+
+                setmetatable( player2is_bot, {
+                    __index = function( _, ply )
+                        if rawget( connected_players, ply ) == nil then
+                            return false
+                        else
+                            local value = PLAYER_IsBot( ply )
+                            rawset( player2is_bot, ply, value )
+                            return value
+                        end
+                    end
+                } )
+
+            else
+                setmetatable( player2is_bot, {
+                    __index = function( _, ply )
+                        local value = PLAYER_IsBot( ply )
+                        rawset( player2is_bot, ply, value )
+                        return value
+                    end
+                } )
+            end
 
         end
 
@@ -1041,7 +1136,6 @@ if CLIENT or SERVER then
         end
 
         local player2steamid = {}
-
         do
 
             local PLAYER_SteamID = PLAYER.SteamID
@@ -1049,8 +1143,9 @@ if CLIENT or SERVER then
             setmetatable( player2steamid, {
                 __index = function( _, ply )
                     if ply:IsBot() then
-                        -- TODO:
-                        return nil
+                        local value = "STEAM_0:0:" .. player2uid[ ply ] -- fake steamid for bots
+                        rawset( player2steamid, ply, value )
+                        return value
                     else
                         local value = PLAYER_SteamID( ply )
                         rawset( player2steamid, ply, value )
@@ -1066,7 +1161,6 @@ if CLIENT or SERVER then
         end
 
         local player2steamid64 = {}
-
         do
 
             local PLAYER_SteamID64 = PLAYER.SteamID64
@@ -1074,8 +1168,9 @@ if CLIENT or SERVER then
             setmetatable( player2steamid64, {
                 __index = function( _, ply )
                     if ply:IsBot() then
-                        -- TODO:
-                        return nil
+                        local value = "765" .. ( ( player2uid[ ply ] * 2 ) + 61197960265728 ) -- fake steamid for bots
+                        rawset( player2steamid64, ply, value )
+                        return value
                     else
                         local value = PLAYER_SteamID64( ply )
                         rawset( player2steamid64, ply, value )
@@ -1093,6 +1188,9 @@ if CLIENT or SERVER then
         hook_Add( "OnEntityCreated", addon_name .. " - Entity & player cache", function( entity )
             if rawget( entity2index, entity ) ~= nil then return end
 
+            entity_count = entity_count + 1
+            rawset( entities, entity_count, entity )
+
             local index = entity2index[ entity ]
             if index == -1 then
                 while rawget( index2entity, index ) ~= nil do
@@ -1102,14 +1200,16 @@ if CLIENT or SERVER then
 
             rawset( index2entity, index, entity )
             rawset( entity2index, entity, index )
-            rawset( entity2class, entity, ENTITY_GetClass( entity ) )
-
-            entity_count = entity_count + 1
-            rawset( entities, entity_count, entity )
+            rawset( entity2class, entity, entity2class[ entity ] )
 
             if entity:IsPlayer() then
+                ---@cast entity Player
                 player_count = player_count + 1
                 rawset( players, player_count, entity )
+
+                local uid = player2uid[ entity ]
+                rawset( uid2player, uid, entity )
+                rawset( player2uid, entity, uid )
             end
 
             ---@diagnostic disable-next-line: redundant-parameter
@@ -1146,6 +1246,8 @@ if CLIENT or SERVER then
 
             if entity:IsPlayer() then
                 timer_Simple( 0, function()
+                    rawset( uid2player, player2uid[ entity ] or -1, nil )
+                    rawset( player2uid, entity, nil )
                     rawset( player2is_bot, entity, nil )
                     rawset( player2steamid, entity, nil )
                     rawset( player2steamid64, entity, nil )
@@ -1266,75 +1368,47 @@ if CLIENT or SERVER then
 
     end
 
-    -- Player cache
-    do
+    -- Player name caching
+    if gameevent_Listen ~= nil then
 
-        local userids = {}
+        local uid2nickname = {}
+
         do
 
-            local PLAYER_UserID = PLAYER.UserID
+            local PLAYER_Nick = PLAYER.Nick
 
-            function PLAYER:UserID()
-                local value = userids[ self ]
-                if value == nil then
-                    value = PLAYER_UserID( self )
-                    userids[ self ] = value
+            local function getName( ply )
+                local nickname = uid2nickname[ ply:UserID() ]
+                if nickname == nil then
+                    nickname = PLAYER_Nick( ply )
+                    if nickname == "" or nickname == "unnamed" then return "unconnected" end
+                    rawset( uid2nickname, ply:UserID(), nickname )
                 end
 
-                return value
+                return nickname
             end
+
+            PLAYER.GetName = getName
+            PLAYER.Nick = getName
 
         end
 
-        local steamids = {}
-        do
+        gameevent_Listen( "player_changename" )
 
-            local PLAYER_SteamID = PLAYER.SteamID
+        hook_Add( "player_changename", addon_name .. " - Player name cache", function( data )
+            local nickname = data.newname
+            if nickname == "" then return end
+            uid2nickname[ data.userid ] = nickname
+            ---@diagnostic disable-next-line: redundant-parameter
+        end, PRE_HOOK )
 
-            function PLAYER:SteamID()
+        gameevent_Listen( "player_disconnect" )
 
-                local value = steamids[ self ]
-                if value == nil then
-                    if self:IsBot() then return nil end
-                    value = PLAYER_SteamID( self )
-                    steamids[ self ] = value
-                end
-
-                return value
-            end
-
-        end
-
-        local steamids64 = {}
-        do
-
-            local PLAYER_SteamID64 = PLAYER.SteamID64
-
-            function PLAYER:SteamID64()
-                local value = steamids64[ self ]
-                if value == nil then
-                    if self:IsBot() then return nil end
-                    value = PLAYER_SteamID64( self )
-                    steamids64[ self ] = value
-                end
-
-                return value
-            end
-
-        end
-
-        hook_Add( "EntityRemoved", addon_name .. " - SteamID cache", function( entity )
-            if not entity:IsPlayer() then return end
-            local isRealPlayer = not entity:IsBot()
-
+        hook_Add( "player_disconnect", addon_name .. " - Player name cache", function( data )
             timer_Simple( 0, function()
-                userids[ entity] = nil
-
-                if isRealPlayer then
-                    steamids[ entity ] = nil
-                    steamids64[ entity ] = nil
-                end
+                uid2nickname[ data.userid ] = nil
             end )
+
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
@@ -1368,9 +1442,9 @@ if CLIENT or SERVER then
     end
 
     -- Decals fix
-    do
+    if gameevent_Listen ~= nil then
 
-        _G.gameevent.Listen( "player_hurt" )
+        gameevent_Listen( "player_hurt" )
         local Player = _G.Player
 
         hook_Add( "player_hurt", addon_name .. " - Decals fix", function( data )
@@ -1434,7 +1508,7 @@ if CLIENT or SERVER then
 
             local function start()
                 hook_Add( "EntityRemoved", addon_name .. " - func_areaportal", function( entity )
-                    if classes[ ENTITY_GetClass( entity ) ] == nil then return end
+                    if classes[ entity:GetClass() ] == nil then return end
 
                     local name = ENTITY_GetName( entity )
                     if #name == 0 then return end
@@ -1474,7 +1548,7 @@ if CLIENT or SERVER then
             local SOLID_VPHYSICS = _G.SOLID_VPHYSICS
 
             hook_Add( "PlayerSpawnedSENT", addon_name .. " - item_suitcharger & item_healthcharger physics", function( _, entity )
-                local className = ENTITY_GetClass( entity )
+                local className = entity:GetClass()
                 if className == "item_suitcharger" or className == "item_healthcharger" then
                     entity:PhysicsInit( SOLID_VPHYSICS )
                     entity:PhysWake()
@@ -1493,7 +1567,7 @@ if CLIENT or SERVER then
             local entities = {}
 
             hook_Add( "OnEntityCreated", addon_name .. " - Kefta podfix", function( entity )
-                if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
+                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
                     entity:AddEFlags( EFL_NO_THINK_FUNCTION )
                 end
 
@@ -1501,7 +1575,7 @@ if CLIENT or SERVER then
             end, PRE_HOOK )
 
             hook_Add( "PlayerLeaveVehicle", addon_name .. " - Kefta podfix", function( _, entity )
-                if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
+                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
                     entities[ #entities + 1 ] = entity
                 end
 
@@ -1518,7 +1592,7 @@ if CLIENT or SERVER then
             end
 
             hook_Add( "PlayerEnteredVehicle", addon_name .. " - Kefta podfix", function( _, entity )
-                if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
+                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
                     entity:RemoveEFlags( EFL_NO_THINK_FUNCTION )
                     removeEntityFromList( entity )
                 end
@@ -1526,7 +1600,7 @@ if CLIENT or SERVER then
             end, PRE_HOOK )
 
             hook_Add( "EntityRemoved", addon_name .. " - prop_vehicle_prisoner_pod", function( entity )
-                if ENTITY_GetClass( entity ) == "prop_vehicle_prisoner_pod" then
+                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
                     removeEntityFromList( entity )
                 end
                 ---@diagnostic disable-next-line: redundant-parameter
@@ -1553,7 +1627,7 @@ if CLIENT or SERVER then
             local ENTITY_TakePhysicsDamage = ENTITY.TakePhysicsDamage
 
             hook_Add( "EntityTakeDamage", addon_name .. " - prop_vehicle_prisoner_pod damage fix", function( entity, damageInfo )
-                if ENTITY_GetClass( entity ) ~= "prop_vehicle_prisoner_pod" or entity.AcceptDamageForce then return end
+                if entity:GetClass() ~= "prop_vehicle_prisoner_pod" or entity.AcceptDamageForce then return end
                 ENTITY_TakePhysicsDamage( entity, damageInfo )
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
