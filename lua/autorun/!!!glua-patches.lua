@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.13.0"
+local addon_name = "gLua Patches v1.14.0"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -14,6 +14,7 @@ local gameevent_Listen = ( gameevent ~= nil and isfunction( gameevent.Listen ) )
 local math_min, math_max, math_random, math_floor = math.min, math.max, math.random, math.floor
 local debug_getmetatable = debug.getmetatable
 local engine_TickCount = engine.TickCount
+local timer_Create = _G.timer.Create
 
 local MENU = _G.MENU_DLL == true
 local CLIENT = _G.CLIENT == true and not MENU
@@ -415,8 +416,6 @@ do
 
     end
 
-    local timer_Create = _G.timer.Create
-
     do
 
         local system_BatteryPower = system.BatteryPower
@@ -494,16 +493,88 @@ do
 
 end
 
--- ispanel
 if CLIENT or MENU then
 
-    local PANEL = FindMetaTable( "Panel" )
+    -- ispanel
+    do
 
-    ---@param value any
-    ---@return boolean
-    function _G.ispanel( value )
-        local metatable = debug_getmetatable( value )
-        return metatable and ( metatable == PANEL or metatable.MetaID == 22 )
+        local PANEL = FindMetaTable( "Panel" )
+
+        ---@param value any
+        ---@return boolean
+        function _G.ispanel( value )
+            local metatable = debug_getmetatable( value )
+            return metatable and ( metatable == PANEL or metatable.MetaID == 22 )
+        end
+
+    end
+
+    -- faster gui.IsConsoleVisible
+    do
+
+        local gui_IsConsoleVisible = gui.IsConsoleVisible
+
+        local is_visible = gui_IsConsoleVisible()
+
+        timer_Create( addon_name .. " - gui.IsConsoleVisible", 0.25, 0, function()
+            is_visible = gui_IsConsoleVisible()
+        end )
+
+        function gui.IsConsoleVisible()
+            return is_visible
+        end
+
+    end
+
+    -- faster gui.IsGameUIVisible
+    do
+
+        local gui_IsGameUIVisible = gui.IsGameUIVisible
+
+        local is_visible = gui_IsGameUIVisible()
+
+        timer_Create( addon_name .. " - gui.IsGameUIVisible", 0.1, 0, function()
+            is_visible = gui_IsGameUIVisible()
+        end )
+
+        function gui.IsGameUIVisible()
+            return is_visible
+        end
+
+    end
+
+    -- faster engine.IsPlayingDemo
+    do
+
+        local engine_IsPlayingDemo = engine.IsPlayingDemo
+
+        local is_playing = engine_IsPlayingDemo()
+
+        timer_Create( addon_name .. " - engine.IsPlayingDemo", 0.5, 0, function()
+            is_playing = engine_IsPlayingDemo()
+        end )
+
+        function engine.IsPlayingDemo()
+            return is_playing
+        end
+
+    end
+
+    -- faster engine.IsRecordingDemo
+    do
+
+        local engine_IsRecordingDemo = engine.IsRecordingDemo
+
+        local is_recording = engine_IsRecordingDemo()
+
+        timer_Create( addon_name .. " - engine.IsRecordingDemo", 0.25, 0, function()
+            is_recording = engine_IsRecordingDemo()
+        end )
+
+        function engine.IsRecordingDemo()
+            return is_recording
+        end
+
     end
 
 end
