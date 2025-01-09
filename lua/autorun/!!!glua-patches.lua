@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.14.0"
+local addon_name = "gLua Patches v1.14.1"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -449,8 +449,6 @@ do
 
             if focus_changed == nil then return end
             focus_changed()
-
-            ---@diagnostic disable-next-line: redundant-parameter
         end )
 
         if CLIENT then
@@ -1099,7 +1097,7 @@ if CLIENT or SERVER then
         end, PRE_HOOK )
 
         function ENTITY:IsWorld()
-            return index2entity[ 0 ] == self
+            return rawget( entity2index, self ) == 0
         end
 
         -- tostring functions
@@ -1255,6 +1253,26 @@ if CLIENT or SERVER then
         function PLAYER:SteamID64()
             return player2steamid64[ self ]
         end
+
+        hook_Add( "PostCleanupMap", addon_name .. " - Entity & player cache", function()
+            for index = entity_count, 1, -1 do
+                local entity = entities[ index ]
+                if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
+                    table_remove( entities, index )
+                    entity_count = entity_count - 1
+                end
+            end
+
+            for index, entity in pairs( index2entity ) do
+                if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
+                    rawset( index2entity, index, nil )
+                    rawset( entity2index, entity, nil )
+                    rawset( entity2class, entity, nil )
+                end
+            end
+
+            ---@diagnostic disable-next-line: redundant-parameter
+        end, PRE_HOOK )
 
         hook_Add( "OnEntityCreated", addon_name .. " - Entity & player cache", function( entity )
             if rawget( entity2index, entity ) ~= nil then return end
