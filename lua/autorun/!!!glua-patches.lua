@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.14.1"
+local addon_name = "gLua Patches v1.14.2"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
@@ -1311,12 +1311,13 @@ if CLIENT or SERVER then
             rawset( on_remove, entity, true )
 
             timer_Simple( 0, function()
-                rawset( index2entity, entity2index[ entity ], nil )
+                local index = entity2index[ entity ]
+                rawset( index2entity, index, nil )
                 rawset( entity2class, entity, nil )
                 rawset( entity2index, entity, nil )
                 rawset( on_remove, entity, nil )
 
-                if ENTITY_IsValid( entity ) then
+                if ( SERVER or index < 0 ) and ENTITY_IsValid( entity ) then
                     if entity:IsPlayer() then
                         entity:Kick( "Player was removed." )
                     else
