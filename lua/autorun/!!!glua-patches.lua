@@ -6,10 +6,10 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.14.2"
+local addon_name = "gLua Patches v1.14.3"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
-local pairs, tonumber, setmetatable, FindMetaTable, rawget, rawset = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget, _G.rawset
+local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
 local gameevent_Listen = ( gameevent ~= nil and isfunction( gameevent.Listen ) ) and gameevent.Listen
 local math_min, math_max, math_random, math_floor = math.min, math.max, math.random, math.floor
 local debug_getmetatable = debug.getmetatable
@@ -939,7 +939,7 @@ if CLIENT or SERVER then
                 if player == nil then
                     local entity = LocalPlayer()
                     if entity and ENTITY_IsValid( entity ) then
-                        rawset( _G, "LocalPlayer", function() return entity end )
+                        _G.rawset( _G, "LocalPlayer", function() return entity end )
                         player = entity
                         return entity
                     else
@@ -977,8 +977,8 @@ if CLIENT or SERVER then
 
         function ents.GetAll()
             local copy = {}
-            for index = 1, entity_count do
-                rawset( copy, index, rawget( entities, index ) )
+            for index = 1, entity_count, 1 do
+                copy[ index ] = entities[ index ]
             end
 
             return copy
@@ -997,8 +997,8 @@ if CLIENT or SERVER then
 
         function player.GetAll()
             local copy = {}
-            for index = 1, player_count do
-                rawset( copy, index, rawget( players, index ) )
+            for index = 1, player_count, 1 do
+                copy[ index ] = players[ index ]
             end
 
             return copy
@@ -1086,9 +1086,9 @@ if CLIENT or SERVER then
         hook_Add( "InitPostEntity", addon_name .. " - World creation", function()
             local entity = index2entity[ 0 ]
             if rawget( entity2index, entity ) == nil then
-                rawset( index2entity, 0, entity )
-                rawset( entity2index, entity, 0 )
-                rawset( entity2class, entity, "worldspawn" )
+                index2entity[ 0 ] = entity
+                entity2index[ entity ] = 0
+                entity2class[ entity ] = "worldspawn"
                 table.insert( entities, 1, entity )
                 entity_count = entity_count + 1
             end
@@ -1178,11 +1178,11 @@ if CLIENT or SERVER then
 
                 setmetatable( player2is_bot, {
                     __index = function( _, ply )
-                        if rawget( connected_players, ply ) == nil then
+                        if connected_players[ ply ] == nil then
                             return false
                         else
                             local value = PLAYER_IsBot( ply )
-                            rawset( player2is_bot, ply, value )
+                            player2is_bot[ ply ] = value
                             return value
                         end
                     end
@@ -1192,7 +1192,7 @@ if CLIENT or SERVER then
                 setmetatable( player2is_bot, {
                     __index = function( _, ply )
                         local value = PLAYER_IsBot( ply )
-                        rawset( player2is_bot, ply, value )
+                        player2is_bot[ ply ] = value
                         return value
                     end
                 } )
@@ -1213,11 +1213,11 @@ if CLIENT or SERVER then
                 __index = function( _, ply )
                     if ply:IsBot() then
                         local value = "STEAM_0:0:" .. player2uid[ ply ] -- fake steamid for bots
-                        rawset( player2steamid, ply, value )
+                        player2steamid[ ply ] = value
                         return value
                     else
                         local value = PLAYER_SteamID( ply )
-                        rawset( player2steamid, ply, value )
+                        player2steamid[ ply ] = value
                         return value
                     end
                 end
@@ -1238,11 +1238,11 @@ if CLIENT or SERVER then
                 __index = function( _, ply )
                     if ply:IsBot() then
                         local value = "765" .. ( ( player2uid[ ply ] * 2 ) + 61197960265728 ) -- fake steamid for bots
-                        rawset( player2steamid64, ply, value )
+                        player2steamid64[ ply ] = value
                         return value
                     else
                         local value = PLAYER_SteamID64( ply )
-                        rawset( player2steamid64, ply, value )
+                        player2steamid64[ ply ] = value
                         return value
                     end
                 end
@@ -1265,9 +1265,9 @@ if CLIENT or SERVER then
 
             for index, entity in pairs( index2entity ) do
                 if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
-                    rawset( index2entity, index, nil )
-                    rawset( entity2index, entity, nil )
-                    rawset( entity2class, entity, nil )
+                    index2entity[ index ] = nil
+                    entity2index[ entity ] = nil
+                    entity2class[ entity ] = nil
                 end
             end
 
@@ -1278,7 +1278,7 @@ if CLIENT or SERVER then
             if rawget( entity2index, entity ) ~= nil then return end
 
             entity_count = entity_count + 1
-            rawset( entities, entity_count, entity )
+            entities[ entity_count ] = entity
 
             local index = entity2index[ entity ]
             if index == -1 then
@@ -1287,18 +1287,18 @@ if CLIENT or SERVER then
                 end
             end
 
-            rawset( index2entity, index, entity )
-            rawset( entity2index, entity, index )
-            rawset( entity2class, entity, entity2class[ entity ] )
+            index2entity[ index ] = entity
+            entity2index[ entity ] = index
+            entity2class[ entity ] = entity2class[ entity ]
 
             if entity:IsPlayer() then
                 ---@cast entity Player
                 player_count = player_count + 1
-                rawset( players, player_count, entity )
+                players[ player_count ] = entity
 
                 local uid = player2uid[ entity ]
-                rawset( uid2player, uid, entity )
-                rawset( player2uid, entity, uid )
+                uid2player[ uid ] = entity
+                player2uid[ entity ] = uid
             end
 
             ---@diagnostic disable-next-line: redundant-parameter
@@ -1307,15 +1307,15 @@ if CLIENT or SERVER then
         local on_remove = {}
 
         hook_Add( "EntityRemoved", addon_name .. " - Entity & player cache", function( entity )
-            if rawget( entity2index, entity ) == nil or rawget( on_remove, entity ) then return end
-            rawset( on_remove, entity, true )
+            if rawget( entity2index, entity ) == nil or on_remove[ entity ] then return end
+            on_remove[ entity ] = true
 
             timer_Simple( 0, function()
                 local index = entity2index[ entity ]
-                rawset( index2entity, index, nil )
-                rawset( entity2class, entity, nil )
-                rawset( entity2index, entity, nil )
-                rawset( on_remove, entity, nil )
+                index2entity[ index ] = nil
+                entity2class[ entity ] = nil
+                entity2index[ entity ] = nil
+                on_remove[ entity ] = nil
 
                 if ( SERVER or index < 0 ) and ENTITY_IsValid( entity ) then
                     if entity:IsPlayer() then
@@ -1336,11 +1336,11 @@ if CLIENT or SERVER then
 
             if entity:IsPlayer() then
                 timer_Simple( 0, function()
-                    rawset( uid2player, player2uid[ entity ] or -1, nil )
-                    rawset( player2uid, entity, nil )
-                    rawset( player2is_bot, entity, nil )
-                    rawset( player2steamid, entity, nil )
-                    rawset( player2steamid64, entity, nil )
+                    uid2player[ player2uid[ entity ] or -1 ] = nil
+                    player2uid[ entity ] = nil
+                    player2is_bot[ entity ] = nil
+                    player2steamid[ entity ] = nil
+                    player2steamid64[ entity ] = nil
                 end )
 
                 for index = player_count, 1, -1 do
@@ -1472,7 +1472,7 @@ if CLIENT or SERVER then
                 if nickname == nil then
                     nickname = PLAYER_Nick( ply )
                     if nickname == "" or nickname == "unnamed" then return "unconnected" end
-                    rawset( uid2nickname, ply:UserID(), nickname )
+                    uid2nickname[ ply:UserID() ] = nickname
                 end
 
                 return nickname
