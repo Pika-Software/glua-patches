@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.14.3"
+local addon_name = "gLua Patches v1.14.4"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -927,31 +927,6 @@ if CLIENT or SERVER then
             end
         end )
 
-        -- LocalPlayer caching
-        do
-
-            local LocalPlayer = _G.LocalPlayer
-            local NULL = _G.NULL
-            local player
-
-            ---@return Player
-            function _G.LocalPlayer()
-                if player == nil then
-                    local entity = LocalPlayer()
-                    if entity and ENTITY_IsValid( entity ) then
-                        _G.rawset( _G, "LocalPlayer", function() return entity end )
-                        player = entity
-                        return entity
-                    else
-                        return NULL
-                    end
-                else
-                    return player
-                end
-            end
-
-        end
-
     else
 
         -- Map name caching
@@ -1082,20 +1057,6 @@ if CLIENT or SERVER then
             return entity2class[ self ]
         end
 
-        -- World entity
-        hook_Add( "InitPostEntity", addon_name .. " - World creation", function()
-            local entity = index2entity[ 0 ]
-            if rawget( entity2index, entity ) == nil then
-                index2entity[ 0 ] = entity
-                entity2index[ entity ] = 0
-                entity2class[ entity ] = "worldspawn"
-                table.insert( entities, 1, entity )
-                entity_count = entity_count + 1
-            end
-
-            ---@diagnostic disable-next-line: redundant-parameter
-        end, PRE_HOOK )
-
         function ENTITY:IsWorld()
             return rawget( entity2index, self ) == 0
         end
@@ -1155,6 +1116,74 @@ if CLIENT or SERVER then
 
         function PLAYER:UserID()
             return player2uid[ self ]
+        end
+
+        -- World and local player caching
+        do
+
+            local local_player_fn
+
+            if CLIENT then
+
+                local LocalPlayer = _G.LocalPlayer
+                local NULL = _G.NULL
+                local local_player
+
+                ---@return Player
+                function local_player_fn()
+                    if local_player == nil then
+                        local entity = LocalPlayer()
+                        if entity and ENTITY_IsValid( entity ) then
+                            _G.rawset( _G, "LocalPlayer", function() return entity end )
+                            local_player = entity
+
+                            if rawget( entity2index, entity ) == nil then
+                                index2entity[ entity:EntIndex() ] = entity
+                                entity2index[ entity ] = entity:EntIndex()
+                                entity2class[ entity ] = "player"
+                                table.insert( entities, 2, entity )
+                                entity_count = entity_count + 1
+
+                                table.insert( players, 1, entity )
+                                player_count = player_count + 1
+
+                                local uid = player2uid[ entity ]
+                                uid2player[ uid ] = entity
+                                player2uid[ entity ] = uid
+                            end
+
+                            return entity
+                        else
+                            return NULL
+                        end
+                    else
+                        return local_player
+                    end
+                end
+
+                _G.LocalPlayer = local_player_fn
+
+            end
+
+            hook_Add( "InitPostEntity", addon_name .. " - World & LocalPlayer", function()
+                hook_Remove( "InitPostEntity", addon_name .. " - World & LocalPlayer" )
+
+                local entity = index2entity[ 0 ]
+                if rawget( entity2index, entity ) == nil then
+                    index2entity[ 0 ] = entity
+                    entity2index[ entity ] = 0
+                    entity2class[ entity ] = "worldspawn"
+                    table.insert( entities, 1, entity )
+                    entity_count = entity_count + 1
+                end
+
+                if local_player_fn ~= nil then
+                    local_player_fn()
+                end
+
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
         end
 
         local player2is_bot = {}
