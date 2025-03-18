@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.14.4"
+local addon_name = "gLua Patches v1.14.5"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -1030,9 +1030,11 @@ if CLIENT or SERVER then
 
         end
 
-        function ENTITY:EntIndex()
-            return entity2index[ self ]
+        local function getEntIndex( entity )
+            return entity2index[ entity ]
         end
+
+        ENTITY.EntIndex = getEntIndex
 
         local entity2class = {}
         do
@@ -1053,9 +1055,11 @@ if CLIENT or SERVER then
 
         end
 
-        function ENTITY:GetClass()
-            return entity2class[ self ]
+        local function getClass( entity )
+            return entity2class[ entity ]
         end
+
+        ENTITY.GetClass = getClass
 
         function ENTITY:IsWorld()
             return rawget( entity2index, self ) == 0
@@ -1069,7 +1073,7 @@ if CLIENT or SERVER then
             ---@private
             function ENTITY:__tostring()
                 if ENTITY_IsValid( self ) then
-                    return string_format( "Entity [%d][%s]", self:EntIndex(), self:GetClass() )
+                    return string_format( "Entity [%d][%s]", getEntIndex( self ), getClass( self ) )
                 elseif self:IsWorld() then
                     return "Entity [0][worldspawn]"
                 else
@@ -1080,7 +1084,7 @@ if CLIENT or SERVER then
             ---@private
             function PLAYER:__tostring()
                 if ENTITY_IsValid( self ) then
-                    return string_format( "Player [%d][%s]", self:EntIndex(), self:Nick() )
+                    return string_format( "Player [%d][%s]", getEntIndex( self ), self:Nick() )
                 else
                     return "[NULL Player]"
                 end
@@ -1138,8 +1142,8 @@ if CLIENT or SERVER then
                             local_player = entity
 
                             if rawget( entity2index, entity ) == nil then
-                                index2entity[ entity:EntIndex() ] = entity
-                                entity2index[ entity ] = entity:EntIndex()
+                                index2entity[ getEntIndex( entity ) ] = entity
+                                entity2index[ entity ] = getEntIndex( entity )
                                 entity2class[ entity ] = "player"
                                 table.insert( entities, 2, entity )
                                 entity_count = entity_count + 1
