@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.14.5"
+local addon_name = "gLua Patches v1.15.0"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -427,7 +427,6 @@ do
 
         timer_Create( addon_name .. " - system.BatteryPower", 1, 0, function()
             battery_power = system_BatteryPower()
-            ---@diagnostic disable-next-line: redundant-parameter
         end )
 
     end
@@ -579,23 +578,22 @@ end
 
 do
 
-    local engine_GetAddons = engine.GetAddons
+    local engine_GetAddons, engine_GetGames = engine.GetAddons, engine.GetGames
 
-    local lastTick = 0
-    local addons, length
+    local addons, games = engine_GetAddons(), engine_GetGames()
+    local addon_count, game_count = #addons, #games
 
-    ---@return table
+    hook.Add( "GameContentChanged", addon_name .. " - engine.GetAddons", function()
+        addons, games = engine_GetAddons(), engine_GetGames()
+        addon_count, game_count = #addons, #games
+
+        ---@diagnostic disable-next-line: redundant-parameter
+    end, PRE_HOOK )
+
     function engine.GetAddons()
-        local tick = engine_TickCount()
-        if tick ~= lastTick then
-            addons = engine_GetAddons()
-            length = #addons
-            lastTick = tick
-        end
-
         local lst = {}
 
-        for i = 1, length, 1 do
+        for i = 1, addon_count, 1 do
             local data = addons[ i ]
             lst[ i ] = {
                 downloaded = data.downloaded,
@@ -609,6 +607,24 @@ do
                 updated = data.updated,
                 wsid = data.wsid
            }
+        end
+
+        return lst
+    end
+
+    function engine.GetGames()
+        local lst = {}
+
+        for i = 1, game_count, 1 do
+            local data = games[ i ]
+            lst[ i ] = {
+                depot = data.depot,
+                folder = data.folder,
+                installed = data.installed,
+                mounted = data.mounted,
+                owned = data.owned,
+                title = data.title
+            }
         end
 
         return lst
@@ -910,7 +926,7 @@ if CLIENT or SERVER then
                     old_values[ name ] = new
                 end
 
-                _G.cvars.OnConVarChanged( name, old, data.cvarvalue )
+                _G.cvars.OnConVarChanged( name, old, new )
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
