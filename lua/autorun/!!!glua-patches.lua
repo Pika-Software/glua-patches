@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.15.0"
+local addon_name = "gLua Patches v1.15.1"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -82,13 +82,13 @@ function table.Random( tbl )
         count = count + 1
     end
 
-    local index = math_random( 1, count )
+    local i = math_random( 1, count )
 
     for key, value in pairs( tbl ) do
-        if index == 1 then
+        if i == 1 then
             return value, key
         else
-            index = index - 1
+            i = i - 1
         end
     end
 end
@@ -456,12 +456,17 @@ do
             do
 
                 local gp_no_more_mouse_lock = _G.CreateConVar( "gp_no_more_mouse_lock", "1", FCVAR_ARCHIVE, "Automatically open the pause menu when the game loses focus." )
-                local gui_IsGameUIVisible, gui_ActivateGameUI = gui.IsGameUIVisible, gui.ActivateGameUI
-                local vgui_CursorVisible = vgui.CursorVisible
+                if gp_no_more_mouse_lock ~= nil then
+                    ---@cast gp_no_more_mouse_lock ConVar
 
-                function focus_changed()
-                    if has_focus or not ( gp_no_more_mouse_lock and gp_no_more_mouse_lock:GetBool() ) or vgui_CursorVisible() or gui_IsGameUIVisible() then return end
-                    gui_ActivateGameUI()
+                    local gui_IsGameUIVisible, gui_ActivateGameUI = gui.IsGameUIVisible, gui.ActivateGameUI
+                    local vgui_CursorVisible = vgui.CursorVisible
+                    local GetBool = gp_no_more_mouse_lock.GetBool
+
+                    function focus_changed()
+                        if has_focus or not GetBool( gp_no_more_mouse_lock ) or vgui_CursorVisible() or gui_IsGameUIVisible() then return end
+                        gui_ActivateGameUI()
+                    end
                 end
 
             end
@@ -678,6 +683,7 @@ if CLIENT or SERVER then
 
     ---@class Player
     local PLAYER = FindMetaTable( "Player" )
+    local PLAYER_IsBot = PLAYER.IsBot
 
     ---@class ConVar
     local CONVAR = FindMetaTable( "ConVar" )
@@ -888,13 +894,15 @@ if CLIENT or SERVER then
         -- cl_drawhud chat fix
         do
 
-            local convar = GetConVar( "cl_drawhud" )
-            if convar ~= nil then
-                ---@cast convar ConVar
+            local cl_drawhud = GetConVar( "cl_drawhud" )
+            if cl_drawhud ~= nil then
+                ---@cast cl_drawhud ConVar
+
+                local GetBool = cl_drawhud.GetBool
                 local chat_Close = _G.chat.Close
 
                 hook_Add( "StartChat", addon_name .. " - cl_drawhud chat fix", function()
-                    if convar:GetBool() then return end
+                    if GetBool( cl_drawhud ) then return end
                     chat_Close()
                     return true
                     ---@diagnostic disable-next-line: redundant-parameter
@@ -968,8 +976,8 @@ if CLIENT or SERVER then
 
         function ents.GetAll()
             local copy = {}
-            for index = 1, entity_count, 1 do
-                copy[ index ] = entities[ index ]
+            for i = 1, entity_count, 1 do
+                copy[ i ] = entities[ i ]
             end
 
             return copy
@@ -988,8 +996,8 @@ if CLIENT or SERVER then
 
         function player.GetAll()
             local copy = {}
-            for index = 1, player_count, 1 do
-                copy[ index ] = players[ index ]
+            for i = 1, player_count, 1 do
+                copy[ i ] = players[ i ]
             end
 
             return copy
@@ -1207,46 +1215,41 @@ if CLIENT or SERVER then
         end
 
         local player2is_bot = {}
-        do
 
-            local PLAYER_IsBot = PLAYER.IsBot
+        if SERVER then
 
-            if SERVER then
+            local connected_players = {}
 
-                local connected_players = {}
+            hook_Add( "PlayerInitialSpawn", addon_name .. " - Player is bot cache", function( ply )
+                connected_players[ ply ] = true
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
 
-                hook_Add( "PlayerInitialSpawn", addon_name .. " - Player is bot cache", function( ply )
-                    connected_players[ ply ] = true
-                    ---@diagnostic disable-next-line: redundant-parameter
-                end, PRE_HOOK )
+            hook_Add( "PlayerDisconnected", addon_name .. " - Player is bot cache", function( ply )
+                connected_players[ ply ] = nil
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
 
-                hook_Add( "PlayerDisconnected", addon_name .. " - Player is bot cache", function( ply )
-                    connected_players[ ply ] = nil
-                    ---@diagnostic disable-next-line: redundant-parameter
-                end, PRE_HOOK )
-
-                setmetatable( player2is_bot, {
-                    __index = function( _, ply )
-                        if connected_players[ ply ] == nil then
-                            return false
-                        else
-                            local value = PLAYER_IsBot( ply )
-                            player2is_bot[ ply ] = value
-                            return value
-                        end
-                    end
-                } )
-
-            else
-                setmetatable( player2is_bot, {
-                    __index = function( _, ply )
+            setmetatable( player2is_bot, {
+                __index = function( _, ply )
+                    if connected_players[ ply ] == nil then
+                        return false
+                    else
                         local value = PLAYER_IsBot( ply )
                         player2is_bot[ ply ] = value
                         return value
                     end
-                } )
-            end
+                end
+            } )
 
+        else
+            setmetatable( player2is_bot, {
+                __index = function( _, ply )
+                    local value = PLAYER_IsBot( ply )
+                    player2is_bot[ ply ] = value
+                    return value
+                end
+            } )
         end
 
         function PLAYER:IsBot()
@@ -1260,7 +1263,7 @@ if CLIENT or SERVER then
 
             setmetatable( player2steamid, {
                 __index = function( _, ply )
-                    if ply:IsBot() then
+                    if PLAYER_IsBot( ply ) then
                         local value = "STEAM_0:0:" .. player2uid[ ply ] -- fake steamid for bots
                         player2steamid[ ply ] = value
                         return value
@@ -1285,7 +1288,7 @@ if CLIENT or SERVER then
 
             setmetatable( player2steamid64, {
                 __index = function( _, ply )
-                    if ply:IsBot() then
+                    if PLAYER_IsBot( ply ) then
                         local value = "765" .. ( ( player2uid[ ply ] * 2 ) + 61197960265728 ) -- fake steamid for bots
                         player2steamid64[ ply ] = value
                         return value
@@ -1304,10 +1307,10 @@ if CLIENT or SERVER then
         end
 
         hook_Add( "PostCleanupMap", addon_name .. " - Entity & player cache", function()
-            for index = entity_count, 1, -1 do
-                local entity = entities[ index ]
+            for i = entity_count, 1, -1 do
+                local entity = entities[ i ]
                 if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
-                    table_remove( entities, index )
+                    table_remove( entities, i )
                     entity_count = entity_count - 1
                 end
             end
@@ -1324,7 +1327,7 @@ if CLIENT or SERVER then
         end, PRE_HOOK )
 
         hook_Add( "OnEntityCreated", addon_name .. " - Entity & player cache", function( entity )
-            if rawget( entity2index, entity ) ~= nil then return end
+            if not ENTITY_IsValid( entity ) or rawget( entity2index, entity ) ~= nil then return end
 
             entity_count = entity_count + 1
             entities[ entity_count ] = entity
@@ -1359,43 +1362,47 @@ if CLIENT or SERVER then
             if rawget( entity2index, entity ) == nil or on_remove[ entity ] then return end
             on_remove[ entity ] = true
 
+            local is_player = entity:IsPlayer()
+            local index = entity2index[ entity ]
+            local puid = is_player and player2uid[ entity ] or -1
+
             timer_Simple( 0, function()
-                local index = entity2index[ entity ]
+                on_remove[ entity ] = nil
+
                 index2entity[ index ] = nil
                 entity2class[ entity ] = nil
                 entity2index[ entity ] = nil
-                on_remove[ entity ] = nil
 
                 if ( SERVER or index < 0 ) and ENTITY_IsValid( entity ) then
-                    if entity:IsPlayer() then
+                    if is_player then
                         entity:Kick( "Player was removed." )
                     else
                         entity:Remove()
                     end
                 end
-            end )
 
-            for index = entity_count, 1, -1 do
-                if entities[ index ] == entity then
-                    entity_count = entity_count - 1
-                    table_remove( entities, index )
-                    break
-                end
-            end
-
-            if entity:IsPlayer() then
-                timer_Simple( 0, function()
-                    uid2player[ player2uid[ entity ] or -1 ] = nil
+                if is_player then
+                    uid2player[ puid ] = nil
                     player2uid[ entity ] = nil
                     player2is_bot[ entity ] = nil
                     player2steamid[ entity ] = nil
                     player2steamid64[ entity ] = nil
-                end )
+                end
+            end )
 
-                for index = player_count, 1, -1 do
-                    if players[ index ] == entity then
+            for i = entity_count, 1, -1 do
+                if entities[ i ] == entity then
+                    entity_count = entity_count - 1
+                    table_remove( entities, i )
+                    break
+                end
+            end
+
+            if is_player then
+                for i = player_count, 1, -1 do
+                    if players[ i ] == entity then
                         player_count = player_count - 1
-                        table_remove( players, index )
+                        table_remove( players, i )
                         break
                     end
                 end
@@ -1614,13 +1621,18 @@ if CLIENT or SERVER then
         do
 
             local sv_lan = GetConVar( "sv_lan" )
-            ---@cast sv_lan ConVar
+            if sv_lan ~= nil then
+                ---@cast sv_lan ConVar
 
-            hook_Add( "PlayerInitialSpawn", addon_name .. " - License check", function( ply )
-                if sv_lan:GetBool() or ply:IsBot() or ply:IsListenServerHost() or ply:IsFullyAuthenticated() then return end
-                ply:Kick( "Your SteamID wasn\'t fully authenticated, try restart your Steam client." )
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+                local GetBool = sv_lan.GetBool
+
+                hook_Add( "PlayerInitialSpawn", addon_name .. " - License check", function( ply )
+                    if GetBool( sv_lan ) or PLAYER_IsBot( ply ) or ply:IsListenServerHost() or ply:IsFullyAuthenticated() then return end
+                    ply:Kick( "Your SteamID wasn\'t fully authenticated, try restart your Steam client." )
+                    ---@diagnostic disable-next-line: redundant-parameter
+                end, PRE_HOOK )
+
+            end
 
         end
 
@@ -1653,8 +1665,8 @@ if CLIENT or SERVER then
                     if #name == 0 then return end
 
                     local portals = ents_FindByClass( "func_areaportal" )
-                    for index = 1, #portals, 1 do
-                        local portal = portals[ index ]
+                    for i = 1, #portals, 1 do
+                        local portal = portals[ i ]
                         if ENTITY_GetInternalVariable( portal, "target" ) == name then
                             ENTITY_SetSaveValue( portal, "target", "" )
                             ENTITY_Fire( portal, "open" )
@@ -1722,9 +1734,9 @@ if CLIENT or SERVER then
             end, PRE_HOOK )
 
             local function removeEntityFromList( entity )
-                for index = #entities, 1, -1 do
-                    if entities[ index ] == entity then
-                        table_remove( entities, index )
+                for i = #entities, 1, -1 do
+                    if entities[ i ] == entity then
+                        table_remove( entities, i )
                         break
                     end
                 end
@@ -1746,9 +1758,9 @@ if CLIENT or SERVER then
             end, PRE_HOOK )
 
             hook_Add( "Think", addon_name .. " - Kefta podfix", function()
-                for index = #entities, 1, -1 do
-                    local entity = entities[ index ]
-                    entities[ index ] = nil
+                for i = #entities, 1, -1 do
+                    local entity = entities[ i ]
+                    entities[ i ] = nil
 
                     if ENTITY_IsValid( entity ) and not ENTITY_GetInternalVariable( entity, "m_bExitAnimOn" ) then
                         entity:AddEFlags( EFL_NO_THINK_FUNCTION )
