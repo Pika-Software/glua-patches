@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.15.1"
+local addon_name = "gLua Patches v1.15.2"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -1165,16 +1165,22 @@ if CLIENT or SERVER then
                             _G.rawset( _G, "LocalPlayer", function() return entity end )
                             local_player = entity
 
+                            -- caching if player is not cached
                             if rawget( entity2index, entity ) == nil then
+                                -- id and class caching
                                 index2entity[ getEntIndex( entity ) ] = entity
                                 entity2index[ entity ] = getEntIndex( entity )
                                 entity2class[ entity ] = "player"
+
+                                -- adding player into entity list
                                 table.insert( entities, 2, entity )
                                 entity_count = entity_count + 1
 
+                                -- adding player into player list
                                 table.insert( players, 1, entity )
                                 player_count = player_count + 1
 
+                                -- player uid caching
                                 local uid = player2uid[ entity ]
                                 uid2player[ uid ] = entity
                                 player2uid[ entity ] = uid
@@ -1196,6 +1202,7 @@ if CLIENT or SERVER then
             hook_Add( "InitPostEntity", addon_name .. " - World & LocalPlayer", function()
                 hook_Remove( "InitPostEntity", addon_name .. " - World & LocalPlayer" )
 
+                -- world entity caching
                 local entity = index2entity[ 0 ]
                 if rawget( entity2index, entity ) == nil then
                     index2entity[ 0 ] = entity
@@ -1205,6 +1212,7 @@ if CLIENT or SERVER then
                     entity_count = entity_count + 1
                 end
 
+                -- local player caching
                 if local_player_fn ~= nil then
                     local_player_fn()
                 end
@@ -1307,6 +1315,7 @@ if CLIENT or SERVER then
         end
 
         hook_Add( "PostCleanupMap", addon_name .. " - Entity & player cache", function()
+            -- entity list rebuild
             for i = entity_count, 1, -1 do
                 local entity = entities[ i ]
                 if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
@@ -1315,6 +1324,7 @@ if CLIENT or SERVER then
                 end
             end
 
+            -- indexes revalidation
             for index, entity in pairs( index2entity ) do
                 if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
                     index2entity[ index ] = nil
@@ -1327,27 +1337,36 @@ if CLIENT or SERVER then
         end, PRE_HOOK )
 
         hook_Add( "OnEntityCreated", addon_name .. " - Entity & player cache", function( entity )
+            -- stop if entity is already registred or invalid
             if not ENTITY_IsValid( entity ) or rawget( entity2index, entity ) ~= nil then return end
 
+            -- adding entity into entity list
             entity_count = entity_count + 1
             entities[ entity_count ] = entity
 
             local index = entity2index[ entity ]
+
+            -- client side id generating
             if index == -1 then
                 while rawget( index2entity, index ) ~= nil do
                     index = index - 1
                 end
             end
 
+            -- caching entity index and class
             index2entity[ index ] = entity
             entity2index[ entity ] = index
             entity2class[ entity ] = entity2class[ entity ]
 
+            -- is player?
             if entity:IsPlayer() then
                 ---@cast entity Player
+
+                -- adding player into player list
                 player_count = player_count + 1
                 players[ player_count ] = entity
 
+                -- caching player uid
                 local uid = player2uid[ entity ]
                 uid2player[ uid ] = entity
                 player2uid[ entity ] = uid
@@ -1359,37 +1378,11 @@ if CLIENT or SERVER then
         local on_remove = {}
 
         hook_Add( "EntityRemoved", addon_name .. " - Entity & player cache", function( entity )
+            -- if entity is already removed or not registred then return
             if rawget( entity2index, entity ) == nil or on_remove[ entity ] then return end
             on_remove[ entity ] = true
 
-            local is_player = entity:IsPlayer()
-            local index = entity2index[ entity ]
-            local puid = is_player and player2uid[ entity ] or -1
-
-            timer_Simple( 0, function()
-                on_remove[ entity ] = nil
-
-                index2entity[ index ] = nil
-                entity2class[ entity ] = nil
-                entity2index[ entity ] = nil
-
-                if ( SERVER or index < 0 ) and ENTITY_IsValid( entity ) then
-                    if is_player then
-                        entity:Kick( "Player was removed." )
-                    else
-                        entity:Remove()
-                    end
-                end
-
-                if is_player then
-                    uid2player[ puid ] = nil
-                    player2uid[ entity ] = nil
-                    player2is_bot[ entity ] = nil
-                    player2steamid[ entity ] = nil
-                    player2steamid64[ entity ] = nil
-                end
-            end )
-
+            -- remove from entity list
             for i = entity_count, 1, -1 do
                 if entities[ i ] == entity then
                     entity_count = entity_count - 1
@@ -1398,6 +1391,10 @@ if CLIENT or SERVER then
                 end
             end
 
+            -- is player?
+            local is_player = entity:IsPlayer()
+
+            -- if player then remove from player list
             if is_player then
                 for i = player_count, 1, -1 do
                     if players[ i ] == entity then
@@ -1407,6 +1404,38 @@ if CLIENT or SERVER then
                     end
                 end
             end
+
+            -- ids precache
+            local index = entity2index[ entity ]
+            local puid = is_player and player2uid[ entity ] or nil
+
+            timer_Simple( 0, function()
+                -- clean-up entity cache
+                index2entity[ index ] = nil
+                entity2class[ entity ] = nil
+                entity2index[ entity ] = nil
+
+                -- remove entity if it's still valid and removing is allowed
+                if ( SERVER or index < 0 ) and ENTITY_IsValid( entity ) then
+                    if is_player then
+                        entity:Kick( "Player was removed." )
+                    else
+                        entity:Remove()
+                    end
+                end
+
+                -- clean-up player cache
+                if is_player then
+                    uid2player[ puid or -1 ] = nil
+                    player2uid[ entity ] = nil
+                    player2is_bot[ entity ] = nil
+                    player2steamid[ entity ] = nil
+                    player2steamid64[ entity ] = nil
+                end
+
+                -- removing is done
+                on_remove[ entity ] = nil
+            end )
 
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
