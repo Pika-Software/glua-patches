@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.15.2"
+local addon_name = "gLua Patches v1.15.3"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -1044,11 +1044,7 @@ if CLIENT or SERVER then
 
             setmetatable( entity2index, {
                 __index = function( _, entity )
-                    if ENTITY_IsValid( entity ) then
-                        return ENTITY_EntIndex( entity )
-                    else
-                        return 0
-                    end
+                    return ENTITY_IsValid( entity ) and ENTITY_EntIndex( entity ) or 0
                 end
             } )
 
@@ -1067,13 +1063,7 @@ if CLIENT or SERVER then
 
             setmetatable( entity2class, {
                 __index = function( _, entity )
-                    if ENTITY_IsValid( entity ) then
-                        return ENTITY_GetClass( entity )
-                    elseif entity:IsWorld() then
-                        return "worldspawn"
-                    else
-                        error( "Tried to get class of invalid entity!", 3 )
-                    end
+                    return ENTITY_GetClass( entity )
                 end
             } )
 
@@ -1089,6 +1079,10 @@ if CLIENT or SERVER then
             return rawget( entity2index, self ) == 0
         end
 
+        local function is_worldspawn( entity )
+            return rawget( entity2index, entity ) == 0 and entity2class[ entity ] == "worldspawn"
+        end
+
         -- tostring functions
         do
 
@@ -1098,7 +1092,7 @@ if CLIENT or SERVER then
             function ENTITY:__tostring()
                 if ENTITY_IsValid( self ) then
                     return string_format( "Entity [%d][%s]", getEntIndex( self ), getClass( self ) )
-                elseif self:IsWorld() then
+                elseif is_worldspawn( self ) then
                     return "Entity [0][worldspawn]"
                 else
                     return "[NULL Entity]"
@@ -1318,7 +1312,7 @@ if CLIENT or SERVER then
             -- entity list rebuild
             for i = entity_count, 1, -1 do
                 local entity = entities[ i ]
-                if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
+                if not ( ENTITY_IsValid( entity ) or is_worldspawn( entity ) ) then
                     table_remove( entities, i )
                     entity_count = entity_count - 1
                 end
@@ -1326,7 +1320,7 @@ if CLIENT or SERVER then
 
             -- indexes revalidation
             for index, entity in pairs( index2entity ) do
-                if not ( ENTITY_IsValid( entity ) or entity:IsWorld() ) then
+                if not ( ENTITY_IsValid( entity ) or is_worldspawn( entity ) ) then
                     index2entity[ index ] = nil
                     entity2index[ entity ] = nil
                     entity2class[ entity ] = nil
