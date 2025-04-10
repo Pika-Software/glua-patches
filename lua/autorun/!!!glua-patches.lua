@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.15.3"
+local addon_name = "gLua Patches v1.15.4"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -1308,6 +1308,66 @@ if CLIENT or SERVER then
             return player2steamid64[ self ]
         end
 
+        local player2nick = {}
+        do
+
+            local PLAYER_Nick = PLAYER.Nick
+
+            setmetatable( player2nick, {
+                __index = function( _, ply )
+                    local value = PLAYER_Nick( ply )
+                    player2nick[ ply ] = value
+                    return value
+                end
+            } )
+
+            if CLIENT then
+
+                local function update_nicknames()
+                    for i = 1, player_count, 1 do
+                        local ply = players[ i ]
+                        player2nick[ ply ] = PLAYER_Nick( ply )
+                    end
+                end
+
+                timer_Create( addon_name .. " - Player name cache", 60, 0, update_nicknames )
+
+                hook_Add( "PostRender", addon_name .. " - Player name cache", function()
+                    hook_Remove( "PostRender", addon_name .. " - Player name cache" )
+                    update_nicknames()
+
+                    ---@diagnostic disable-next-line: redundant-parameter
+                end, PRE_HOOK )
+
+            end
+
+            local function get_name( ply )
+                return player2nick[ ply ]
+            end
+
+            PLAYER.GetName = get_name
+            PLAYER.Nick = get_name
+
+        end
+
+        if gameevent_Listen ~= nil then
+
+            gameevent_Listen( "player_changename" )
+
+            hook_Add( "player_changename", addon_name .. " - Player name cache", function( data )
+                local nickname = data.newname
+                if nickname == "" then return end
+
+                local ply = uid2player[ data.userid ]
+                if ply ~= nil and ENTITY_IsValid( ply ) then
+                    player2nick[ ply ] = nickname
+                end
+
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
+        end
+
         hook_Add( "PostCleanupMap", addon_name .. " - Entity & player cache", function()
             -- entity list rebuild
             for i = entity_count, 1, -1 do
@@ -1422,6 +1482,7 @@ if CLIENT or SERVER then
                 if is_player then
                     uid2player[ puid or -1 ] = nil
                     player2uid[ entity ] = nil
+                    player2nick[ entity ] = nil
                     player2is_bot[ entity ] = nil
                     player2steamid[ entity ] = nil
                     player2steamid64[ entity ] = nil
@@ -1534,52 +1595,6 @@ if CLIENT or SERVER then
             self.m_tAimTrace = traceResult
             return traceResult
         end
-
-    end
-
-    -- Player name caching
-    if gameevent_Listen ~= nil then
-
-        local uid2nickname = {}
-
-        do
-
-            local PLAYER_Nick = PLAYER.Nick
-
-            local function getName( ply )
-                local nickname = uid2nickname[ ply:UserID() ]
-                if nickname == nil then
-                    nickname = PLAYER_Nick( ply )
-                    if nickname == "" or nickname == "unnamed" then return "unconnected" end
-                    uid2nickname[ ply:UserID() ] = nickname
-                end
-
-                return nickname
-            end
-
-            PLAYER.GetName = getName
-            PLAYER.Nick = getName
-
-        end
-
-        gameevent_Listen( "player_changename" )
-
-        hook_Add( "player_changename", addon_name .. " - Player name cache", function( data )
-            local nickname = data.newname
-            if nickname == "" then return end
-            uid2nickname[ data.userid ] = nickname
-            ---@diagnostic disable-next-line: redundant-parameter
-        end, PRE_HOOK )
-
-        gameevent_Listen( "player_disconnect" )
-
-        hook_Add( "player_disconnect", addon_name .. " - Player name cache", function( data )
-            timer_Simple( 0, function()
-                uid2nickname[ data.userid ] = nil
-            end )
-
-            ---@diagnostic disable-next-line: redundant-parameter
-        end, PRE_HOOK )
 
     end
 
