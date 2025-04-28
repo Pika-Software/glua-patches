@@ -6,7 +6,7 @@ if _G.__gluaPatches then return end
 ---@diagnostic disable-next-line: inject-field
 _G.__gluaPatches = true
 
-local addon_name = "gLua Patches v1.15.4"
+local addon_name = "gLua Patches v1.15.5"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -1323,21 +1323,12 @@ if CLIENT or SERVER then
 
             if CLIENT then
 
-                local function update_nicknames()
+                timer_Create( addon_name .. " - Player name cache", 5, 0, function()
                     for i = 1, player_count, 1 do
                         local ply = players[ i ]
                         player2nick[ ply ] = PLAYER_Nick( ply )
                     end
-                end
-
-                timer_Create( addon_name .. " - Player name cache", 60, 0, update_nicknames )
-
-                hook_Add( "PostRender", addon_name .. " - Player name cache", function()
-                    hook_Remove( "PostRender", addon_name .. " - Player name cache" )
-                    update_nicknames()
-
-                    ---@diagnostic disable-next-line: redundant-parameter
-                end, PRE_HOOK )
+                end )
 
             end
 
@@ -1353,15 +1344,29 @@ if CLIENT or SERVER then
         if gameevent_Listen ~= nil then
 
             gameevent_Listen( "player_changename" )
+            gameevent_Listen( "player_info" )
 
             hook_Add( "player_changename", addon_name .. " - Player name cache", function( data )
-                local nickname = data.newname
-                if nickname == "" then return end
+                timer_Simple( 0, function()
+                    local nickname = data.newname
+                    if nickname == "" then return end
 
-                local ply = uid2player[ data.userid ]
-                if ply ~= nil and ENTITY_IsValid( ply ) then
-                    player2nick[ ply ] = nickname
-                end
+                    local ply = uid2player[ data.userid ]
+                    if ply ~= nil and ENTITY_IsValid( ply ) then
+                        player2nick[ ply ] = nickname
+                    end
+                end )
+
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
+            hook_Add( "player_info", "player_info_example", function( data )
+                timer_Simple( 0, function()
+                    local ply = uid2player[ data.userid ]
+                    if ply ~= nil and ENTITY_IsValid( ply ) then
+                        player2nick[ ply ] = data.name
+                    end
+                end )
 
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
