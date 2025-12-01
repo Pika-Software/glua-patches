@@ -1,12 +1,10 @@
 local _G = _G
 
--- Already patched
-if _G.__gluaPatches then return end
-
+if _G.__glua_patches then return end
 ---@diagnostic disable-next-line: inject-field
-_G.__gluaPatches = true
+_G.__glua_patches = true
 
-local addon_name = "gLua Patches v1.15.5"
+local addon_name = "gLua Patches v1.16.0"
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -140,6 +138,8 @@ end
 
 do
 
+    ---@type Color
+    ---@diagnostic disable-next-line: assign-type-mismatch
     local COLOR = FindMetaTable( "Color" )
 
     ---@param value any
@@ -455,6 +455,7 @@ do
             -- No more mouse lock
             do
 
+                ---@diagnostic disable-next-line: param-type-mismatch
                 local gp_no_more_mouse_lock = _G.CreateConVar( "gp_no_more_mouse_lock", "1", FCVAR_ARCHIVE, "Automatically open the pause menu when the game loses focus." )
                 if gp_no_more_mouse_lock ~= nil then
                     ---@cast gp_no_more_mouse_lock ConVar
@@ -918,6 +919,7 @@ if CLIENT or SERVER then
 
             local CONVAR_GetDefault = CONVAR.GetDefault
             gameevent_Listen( "server_cvar" )
+
             local old_values = {}
 
             hook_Add( "server_cvar", addon_name .. " - OnConVarChanged for replicated cvars", function( data )
@@ -963,6 +965,9 @@ if CLIENT or SERVER then
 
     end
 
+    local gc_key = { __mode = "k" }
+    local gc_value = { __mode = "v" }
+
     -- Entity index cache
     do
 
@@ -971,11 +976,17 @@ if CLIENT or SERVER then
 
         local inext = ipairs( ents )
 
+        ---@type Entity[]
         local entities = ents.GetAll()
+
+        ---@type integer
         local entity_count = #entities
 
         function ents.GetAll()
             local copy = {}
+
+            setmetatable( copy, gc_value )
+
             for i = 1, entity_count, 1 do
                 copy[ i ] = entities[ i ]
             end
@@ -991,11 +1002,17 @@ if CLIENT or SERVER then
             return inext, entities, 0
         end
 
+        ---@type Player[]
         local players = player.GetAll()
+
+        ---@type integer
         local player_count = #players
 
         function player.GetAll()
             local copy = {}
+
+            setmetatable( copy, gc_value )
+
             for i = 1, player_count, 1 do
                 copy[ i ] = players[ i ]
             end
@@ -1011,7 +1028,45 @@ if CLIENT or SERVER then
             return inext, players, 0
         end
 
+        ---@type Player[]
+        local human_players = {}
+
+        ---@type integer
+        local human_players_count = 0
+
+        function player.GetHumans()
+            local copy = {}
+
+            setmetatable( copy, gc_value )
+
+            for i = 1, human_players_count, 1 do
+                copy[ i ] = human_players[ i ]
+            end
+
+            return copy
+        end
+
+        ---@type Player[]
+        local bot_players = {}
+
+        ---@type integer
+        local bot_players_count = 0
+
+        function player.GetBots()
+            local copy = {}
+
+            setmetatable( copy, gc_value )
+
+            for i = 1, bot_players_count, 1 do
+                copy[ i ] = bot_players[ i ]
+            end
+
+            return copy
+        end
+
+        ---@type table<integer, Entity>
         local index2entity = {}
+
         do
 
             local game_GetWorld = game.GetWorld
@@ -1024,7 +1079,8 @@ if CLIENT or SERVER then
                     else
                         return Entity( index )
                     end
-                end
+                end,
+                __mode = "v"
             } )
 
         end
@@ -1037,7 +1093,9 @@ if CLIENT or SERVER then
             return index2entity[ 0 ]
         end
 
+        ---@type table<Entity, integer>
         local entity2index = {}
+
         do
 
             local ENTITY_EntIndex = ENTITY.EntIndex
@@ -1045,7 +1103,8 @@ if CLIENT or SERVER then
             setmetatable( entity2index, {
                 __index = function( _, entity )
                     return ENTITY_IsValid( entity ) and ENTITY_EntIndex( entity ) or 0
-                end
+                end,
+                __mode = "k"
             } )
 
         end
@@ -1056,7 +1115,9 @@ if CLIENT or SERVER then
 
         ENTITY.EntIndex = getEntIndex
 
+        ---@type table<Entity, string>
         local entity2class = {}
+
         do
 
             local ENTITY_GetClass = ENTITY.GetClass
@@ -1064,7 +1125,8 @@ if CLIENT or SERVER then
             setmetatable( entity2class, {
                 __index = function( _, entity )
                     return ENTITY_GetClass( entity )
-                end
+                end,
+                __mode = "k"
             } )
 
         end
@@ -1110,7 +1172,9 @@ if CLIENT or SERVER then
 
         end
 
+        ---@type table<integer, Player>
         local uid2player = {}
+
         do
 
             local Player = _G.Player
@@ -1118,12 +1182,15 @@ if CLIENT or SERVER then
             setmetatable( uid2player, {
                 __index = function( _, index )
                     return Player( index )
-                end
+                end,
+                __mode = "v"
             } )
 
         end
 
+        ---@type table<Player, integer>
         local player2uid = {}
+
         do
 
             local PLAYER_UserID = PLAYER.UserID
@@ -1131,7 +1198,8 @@ if CLIENT or SERVER then
             setmetatable( player2uid, {
                 __index = function( _, ply )
                     return PLAYER_UserID( ply )
-                end
+                end,
+                __mode = "k"
             } )
 
         end
@@ -1173,6 +1241,9 @@ if CLIENT or SERVER then
                                 -- adding player into player list
                                 table.insert( players, 1, entity )
                                 player_count = player_count + 1
+
+                                human_players_count = human_players_count + 1
+                                human_players[ human_players_count ] = entity
 
                                 -- player uid caching
                                 local uid = player2uid[ entity ]
@@ -1216,19 +1287,36 @@ if CLIENT or SERVER then
 
         end
 
+        ---@type table<Player, boolean>
         local player2is_bot = {}
 
         if SERVER then
 
+            ---@type table<Player, boolean>
             local connected_players = {}
+
+            setmetatable( connected_players, gc_key )
 
             hook_Add( "PlayerInitialSpawn", addon_name .. " - Player is bot cache", function( ply )
                 connected_players[ ply ] = true
+
+                if player2is_bot[ ply ] then
+                    bot_players_count = bot_players_count + 1
+                    bot_players[ bot_players_count ] = ply
+                else
+                    human_players_count = human_players_count + 1
+                    human_players[ human_players_count ] = ply
+                end
+
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
             hook_Add( "PlayerDisconnected", addon_name .. " - Player is bot cache", function( ply )
-                connected_players[ ply ] = nil
+                timer_Simple( 0, function()
+                    connected_players[ ply ] = nil
+                    player2is_bot[ ply ] = nil
+                end )
+
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
 
@@ -1236,98 +1324,181 @@ if CLIENT or SERVER then
                 __index = function( _, ply )
                     if connected_players[ ply ] == nil then
                         return false
-                    else
-                        local value = PLAYER_IsBot( ply )
-                        player2is_bot[ ply ] = value
-                        return value
                     end
-                end
+
+                    local value = PLAYER_IsBot( ply )
+                    player2is_bot[ ply ] = value
+                    return value
+                end,
+                __mode = "k"
             } )
 
         else
+
             setmetatable( player2is_bot, {
                 __index = function( _, ply )
                     local value = PLAYER_IsBot( ply )
                     player2is_bot[ ply ] = value
                     return value
-                end
+                end,
+                __mode = "k"
             } )
+
         end
 
         function PLAYER:IsBot()
             return player2is_bot[ self ]
         end
 
+        ---@type table<Player, string>
         local player2steamid = {}
+
+        ---@type table<string, Player>
+        local steamid2player = {}
+
         do
 
             local PLAYER_SteamID = PLAYER.SteamID
 
             setmetatable( player2steamid, {
                 __index = function( _, ply )
-                    if PLAYER_IsBot( ply ) then
-                        local value = "STEAM_0:0:" .. player2uid[ ply ] -- fake steamid for bots
-                        player2steamid[ ply ] = value
-                        return value
+                    local value
+
+                    if player2is_bot[ ply ] then
+                        value = "STEAM_0:0:" .. player2uid[ ply ] -- fake steamid for bots
                     else
-                        local value = PLAYER_SteamID( ply )
-                        player2steamid[ ply ] = value
-                        return value
+                        value = PLAYER_SteamID( ply )
                     end
-                end
+
+                    player2steamid[ ply ] = value
+                    steamid2player[ value ] = ply
+                    return value
+                end,
+                __mode = "k"
             } )
 
+        end
+
+        setmetatable( steamid2player, {
+            __index = function( _, key )
+                for i = 1, player_count, 1 do
+                    local ply = players[ i ]
+                    if player2steamid[ ply ] == key then
+                        steamid2player[ key ] = ply
+                        return ply
+                    end
+                end
+            end,
+            __mode = "v"
+        } )
+
+        function player.GetBySteamID( steamid )
+            return steamid2player[ steamid ] or false
         end
 
         function PLAYER:SteamID()
             return player2steamid[ self ]
         end
 
+        ---@type table<Player, string>
         local player2steamid64 = {}
+
+        ---@type table<string, Player>
+        local steamid642player = {}
+
         do
 
             local PLAYER_SteamID64 = PLAYER.SteamID64
 
             setmetatable( player2steamid64, {
                 __index = function( _, ply )
+                    local value
+
                     if PLAYER_IsBot( ply ) then
-                        local value = "765" .. ( ( player2uid[ ply ] * 2 ) + 61197960265728 ) -- fake steamid for bots
-                        player2steamid64[ ply ] = value
-                        return value
+                        value = "765" .. ( ( player2uid[ ply ] * 2 ) + 61197960265728 ) -- fake steamid for bots
                     else
-                        local value = PLAYER_SteamID64( ply )
-                        player2steamid64[ ply ] = value
-                        return value
+                        value = PLAYER_SteamID64( ply )
                     end
-                end
+
+                    player2steamid64[ ply ] = value
+                    steamid642player[ value ] = ply
+                    return value
+                end,
+                __mode = "k"
             } )
 
+        end
+
+        setmetatable( steamid642player, {
+            __index = function( _, key )
+                for i = 1, player_count, 1 do
+                    local ply = players[ i ]
+                    if player2steamid64[ ply ] == key then
+                        steamid642player[ key ] = ply
+                        return ply
+                    end
+                end
+            end,
+            __mode = "v"
+        } )
+
+        function player.GetBySteamID64( steamid )
+            return steamid642player[ steamid ] or false
         end
 
         function PLAYER:SteamID64()
             return player2steamid64[ self ]
         end
 
+        do
+
+            ---@type table<integer, Player>
+            local accountid2player = {}
+
+            local PLAYER_AccountID = PLAYER.AccountID
+
+            setmetatable( accountid2player, {
+                __index = function( _, key )
+                    for i = 1, player_count, 1 do
+                        local ply = players[ i ]
+                        if PLAYER_AccountID( ply ) == key then
+                            accountid2player[ key ] = ply
+                            return ply
+                        end
+                    end
+                end,
+                __mode = "v"
+            } )
+
+            function player.GetByAccountID( accountid )
+                return accountid2player[ accountid ] or false
+            end
+
+        end
+
+        ---@type table<Player, string>
         local player2nick = {}
+
         do
 
             local PLAYER_Nick = PLAYER.Nick
 
-            setmetatable( player2nick, {
+            local nicknames_metatable = {
                 __index = function( _, ply )
                     local value = PLAYER_Nick( ply )
                     player2nick[ ply ] = value
                     return value
-                end
-            } )
+                end,
+                __mode = "k"
+            }
+
+            setmetatable( player2nick, nicknames_metatable )
 
             if CLIENT then
 
-                timer_Create( addon_name .. " - Player name cache", 5, 0, function()
-                    for i = 1, player_count, 1 do
-                        local ply = players[ i ]
-                        player2nick[ ply ] = PLAYER_Nick( ply )
-                    end
+                timer_Create( addon_name .. " - Player name re-cache", 3, 0, function()
+                    player2nick = {}
+                    setmetatable( player2nick, nicknames_metatable )
                 end )
 
             end
@@ -1425,6 +1596,16 @@ if CLIENT or SERVER then
                 player_count = player_count + 1
                 players[ player_count ] = entity
 
+                if CLIENT then
+                    if player2is_bot[ entity ] then
+                        bot_players_count = bot_players_count + 1
+                        bot_players[ bot_players_count ] = entity
+                    else
+                        human_players_count = human_players_count + 1
+                        human_players[ human_players_count ] = entity
+                    end
+                end
+
                 -- caching player uid
                 local uid = player2uid[ entity ]
                 uid2player[ uid ] = entity
@@ -1434,6 +1615,7 @@ if CLIENT or SERVER then
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
+        ---@type table<Entity, boolean>
         local on_remove = {}
 
         hook_Add( "EntityRemoved", addon_name .. " - Entity & player cache", function( entity )
@@ -1462,6 +1644,22 @@ if CLIENT or SERVER then
                         break
                     end
                 end
+
+                for i = human_players_count, 1, -1 do
+                    if human_players[ i ] == entity then
+                        human_players_count = human_players_count - 1
+                        table_remove( human_players, i )
+                        break
+                    end
+                end
+
+                for i = bot_players_count, 1, -1 do
+                    if bot_players[ i ] == entity then
+                        bot_players_count = bot_players_count - 1
+                        table_remove( bot_players, i )
+                        break
+                    end
+                end
             end
 
             -- ids precache
@@ -1477,6 +1675,7 @@ if CLIENT or SERVER then
                 -- remove entity if it's still valid and removing is allowed
                 if ( SERVER or index < 0 ) and ENTITY_IsValid( entity ) then
                     if is_player then
+                        ---@cast entity Player
                         entity:Kick( "Player was removed." )
                     else
                         entity:Remove()
@@ -1541,7 +1740,10 @@ if CLIENT or SERVER then
 
         local TraceLine = util.TraceLine
         local distance = 4096 * 8
+
         local trace = {}
+
+        setmetatable( trace, gc_value )
 
         function util.GetPlayerTrace( ply, dir )
             local start = ply:EyePos()
@@ -1619,14 +1821,14 @@ if CLIENT or SERVER then
 
         end
 
-        -- No more air crouching
-        local MOVETYPE_NOCLIP, IN_DUCK = _G.MOVETYPE_NOCLIP, _G.IN_DUCK
+        -- -- No more air crouching
+        -- local MOVETYPE_NOCLIP, IN_DUCK = _G.MOVETYPE_NOCLIP, _G.IN_DUCK
 
-        hook_Add( "StartCommand", addon_name .. " - No more air crouching", function( ply, cmd )
-            if GetMoveType( ply ) == MOVETYPE_NOCLIP or IsOnGround( ply ) or cmd:KeyDown( IN_DUCK ) or not ply:Crouching() then return end
-            cmd:AddKey( IN_DUCK )
-            ---@diagnostic disable-next-line: redundant-parameter
-        end, PRE_HOOK )
+        -- hook_Add( "StartCommand", addon_name .. " - No more air crouching", function( ply, cmd )
+        --     if GetMoveType( ply ) == MOVETYPE_NOCLIP or IsOnGround( ply ) or cmd:KeyDown( IN_DUCK ) or not ply:Crouching() then return end
+        --     cmd:AddKey( IN_DUCK )
+        --     ---@diagnostic disable-next-line: redundant-parameter
+        -- end, PRE_HOOK )
 
     end
 
@@ -1656,7 +1858,11 @@ if CLIENT or SERVER then
 
         -- Level reload command
         _G.concommand.Add( "reloadlevel", function( ply )
-            if ply and not ( ply:IsSuperAdmin() or ply:IsListenServerHost() ) then return end
+            if ( ply and ply:IsValid() ) and not ( ply:IsSuperAdmin() or ply:IsListenServerHost() ) then
+                ply:ChatPrint( "You don\'t have permission to use this command." )
+                return
+            end
+
             RunConsoleCommand( "changelevel", game.GetMap() )
         end, nil, "Reload the current server map and reconnect all players." )
 
@@ -1752,67 +1958,68 @@ if CLIENT or SERVER then
 
         end
 
-        -- https://github.com/Kefta/gs_podfix
-        -- https://github.com/Facepunch/garrysmod-issues/issues/2452
-        do
+        -- https://github.com/Pika-Software/glua-patches/issues/15
+        -- -- https://github.com/Kefta/gs_podfix
+        -- -- https://github.com/Facepunch/garrysmod-issues/issues/2452
+        -- do
 
-            local EFL_NO_THINK_FUNCTION = _G.EFL_NO_THINK_FUNCTION
-            local table_remove = table.remove
-            local entities = {}
+        --     local EFL_NO_THINK_FUNCTION = _G.EFL_NO_THINK_FUNCTION
+        --     local table_remove = table.remove
+        --     local entities = {}
 
-            hook_Add( "OnEntityCreated", addon_name .. " - Kefta podfix", function( entity )
-                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
-                    entity:AddEFlags( EFL_NO_THINK_FUNCTION )
-                end
+        --     hook_Add( "OnEntityCreated", addon_name .. " - Kefta podfix", function( entity )
+        --         if entity:GetClass() == "prop_vehicle_prisoner_pod" then
+        --             entity:AddEFlags( EFL_NO_THINK_FUNCTION )
+        --         end
 
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-            hook_Add( "PlayerLeaveVehicle", addon_name .. " - Kefta podfix", function( _, entity )
-                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
-                    entities[ #entities + 1 ] = entity
-                end
+        --     hook_Add( "PlayerLeaveVehicle", addon_name .. " - Kefta podfix", function( _, entity )
+        --         if entity:GetClass() == "prop_vehicle_prisoner_pod" then
+        --             entities[ #entities + 1 ] = entity
+        --         end
 
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-            local function removeEntityFromList( entity )
-                for i = #entities, 1, -1 do
-                    if entities[ i ] == entity then
-                        table_remove( entities, i )
-                        break
-                    end
-                end
-            end
+        --     local function removeEntityFromList( entity )
+        --         for i = #entities, 1, -1 do
+        --             if entities[ i ] == entity then
+        --                 table_remove( entities, i )
+        --                 break
+        --             end
+        --         end
+        --     end
 
-            hook_Add( "PlayerEnteredVehicle", addon_name .. " - Kefta podfix", function( _, entity )
-                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
-                    entity:RemoveEFlags( EFL_NO_THINK_FUNCTION )
-                    removeEntityFromList( entity )
-                end
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --     hook_Add( "PlayerEnteredVehicle", addon_name .. " - Kefta podfix", function( _, entity )
+        --         if entity:GetClass() == "prop_vehicle_prisoner_pod" then
+        --             entity:RemoveEFlags( EFL_NO_THINK_FUNCTION )
+        --             removeEntityFromList( entity )
+        --         end
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-            hook_Add( "EntityRemoved", addon_name .. " - prop_vehicle_prisoner_pod", function( entity )
-                if entity:GetClass() == "prop_vehicle_prisoner_pod" then
-                    removeEntityFromList( entity )
-                end
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --     hook_Add( "EntityRemoved", addon_name .. " - prop_vehicle_prisoner_pod", function( entity )
+        --         if entity:GetClass() == "prop_vehicle_prisoner_pod" then
+        --             removeEntityFromList( entity )
+        --         end
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-            hook_Add( "Think", addon_name .. " - Kefta podfix", function()
-                for i = #entities, 1, -1 do
-                    local entity = entities[ i ]
-                    entities[ i ] = nil
+        --     hook_Add( "Think", addon_name .. " - Kefta podfix", function()
+        --         for i = #entities, 1, -1 do
+        --             local entity = entities[ i ]
+        --             entities[ i ] = nil
 
-                    if ENTITY_IsValid( entity ) and not ENTITY_GetInternalVariable( entity, "m_bExitAnimOn" ) then
-                        entity:AddEFlags( EFL_NO_THINK_FUNCTION )
-                    end
-                end
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --             if ENTITY_IsValid( entity ) and not ENTITY_GetInternalVariable( entity, "m_bExitAnimOn" ) then
+        --                 entity:AddEFlags( EFL_NO_THINK_FUNCTION )
+        --             end
+        --         end
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-        end
+        -- end
 
         -- Fixes for prop_vehicle_prisoner_pod, worldspawn (and other not Valid but not NULL entities) damage taking (bullets only)
         -- Explosive damage only works if is located in front of prop_vehicle_prisoner_pod (wtf?)
@@ -1821,6 +2028,7 @@ if CLIENT or SERVER then
             local ENTITY_TakePhysicsDamage = ENTITY.TakePhysicsDamage
 
             hook_Add( "EntityTakeDamage", addon_name .. " - prop_vehicle_prisoner_pod damage fix", function( entity, damageInfo )
+                ---@diagnostic disable-next-line: undefined-field
                 if entity:GetClass() ~= "prop_vehicle_prisoner_pod" or entity.AcceptDamageForce then return end
                 ENTITY_TakePhysicsDamage( entity, damageInfo )
                 ---@diagnostic disable-next-line: redundant-parameter
@@ -1828,50 +2036,58 @@ if CLIENT or SERVER then
 
         end
 
-        -- Players alive cache
-        do
+        -- -- Players alive cache
+        -- do
 
-            local PLAYER_Alive = PLAYER.Alive
-            local players = {}
+        --     local PLAYER_Alive = PLAYER.Alive
+        --     local alive_players = {}
 
-            setmetatable( players, {
-                __index = function( _, ply )
-                    return PLAYER_Alive( ply )
-                end
-            } )
+        --     setmetatable( alive_players, {
+        --         __index = function( _, ply )
+        --             return PLAYER_Alive( ply )
+        --         end
+        --     } )
 
-            hook_Add( "PlayerSpawn", addon_name .. " - Alive cache", function( ply )
-                players[ ply ] = true
+        --     hook_Add( "PlayerSpawn", addon_name .. " - Alive cache", function( ply )
+        --         alive_players[ ply ] = true
 
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-            hook_Add( "PostPlayerDeath", addon_name .. " - Alive cache", function( ply )
-                players[ ply ] = false
+        --     hook_Add( "PostPlayerDeath", addon_name .. " - Alive cache", function( ply )
+        --         alive_players[ ply ] = false
 
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-            hook_Add( "EntityRemoved", addon_name .. " - Alive cache", function( entity )
-                if entity:IsPlayer() then
-                    timer_Simple( 0, function()
-                        players[ entity ] = nil
-                    end )
-                end
+        --     hook_Add( "EntityRemoved", addon_name .. " - Alive cache", function( entity )
+        --         if entity:IsPlayer() then
+        --             timer_Simple( 0, function()
+        --                 alive_players[ entity ] = nil
+        --             end )
+        --         end
 
-                ---@diagnostic disable-next-line: redundant-parameter
-            end, PRE_HOOK )
+        --         ---@diagnostic disable-next-line: redundant-parameter
+        --     end, PRE_HOOK )
 
-            function PLAYER:Alive()
-                return players[ self ]
-            end
+        --     function PLAYER:Alive()
+        --         return alive_players[ self ]
+        --     end
 
-        end
+        -- end
 
     end
 
 end
 
 MsgC( SERVER and Color( 50, 100, 250 ) or Color( 250, 100, 50 ), "[" .. addon_name .. "] ", _G.color_white, table.Random( {
-    "Here For You ♪", "Patched", "Alright", "Thanks for installation <3", "Increasing performance!", "Sometimes we just need more cache :>"
+    "Here For You ♪",
+    "Patched!",
+    "Thanks for installation <3",
+    "Increasing performance!",
+    "Sometimes we just need more cache :>",
+    "When everything is wrong, we move along ♪",
+    "Move along, move along like I know ya do ♪",
+    "I'll prevail with every battle if I'm right ♪",
+    "Look at where we started and where we will end ♪"
 } ) .. "\n" )

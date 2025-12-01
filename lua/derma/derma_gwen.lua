@@ -1,144 +1,198 @@
 ---@diagnostic disable-next-line: undefined-global
 local _G = _G
 
-local surface_SetDrawColor, surface_SetMaterial, surface_DrawTexturedRectUV
-do
-    local surface = _G.surface
-    surface_SetDrawColor, surface_SetMaterial, surface_DrawTexturedRectUV = surface.SetDrawColor, surface.SetMaterial, surface.DrawTexturedRectUV
-end
+---@class Panel
+local PANEL = _G.FindMetaTable( "Panel" )
 
+---@type IMaterial
+---@diagnostic disable-next-line: assign-type-mismatch
+local IMaterial = _G.FindMetaTable( "IMaterial" )
+local IMaterial_IsError = IMaterial.IsError
+
+local surface_SetDrawColor, surface_SetMaterial, surface_DrawTexturedRectUV = surface.SetDrawColor, surface.SetMaterial, surface.DrawTexturedRectUV
+local math_min, math_ceil, math_floor = math.min, math.ceil, math.floor
+
+---@class GWEN
 local GWEN = {}
+
+---@diagnostic disable-next-line: inject-field
 _G.GWEN = GWEN
 
-do
-
-    local math_min, math_ceil, math_floor
-    do
-        local math = _G.math
-        math_min, math_ceil, math_floor = math.min, math.ceil, math.floor
-    end
-
-    function GWEN.CreateTextureBorder( _xo, _yo, _wo, _ho, l, t, r, b, material_override )
+function GWEN.CreateTextureBorder( x_offset, y_offset, width_offset, height_offset, l, t, r, b, material )
+    if material == nil or IMaterial_IsError( material ) then
         ---@diagnostic disable-next-line: undefined-field
-        local material = SKIN and SKIN.GwenTexture or material_override
-        if material_override and not material_override:IsError() then
-            material = material_override
-        end
-
-        local texture = material:GetTexture( "$basetexture" )
-        local width, height = texture:Width(), texture:Height()
-
-        local _x, _y, _w, _h = _xo / width, _yo / height, _wo / width, _ho / height
-
-        local left, right, top, bottom = 0, 0, 0, 0
-        local _l, _t, _r, _b = 0, 0, 0, 0
-
-        return function( x, y, w, h, color )
-            if color == nil then
-                surface_SetDrawColor( 255, 255, 255, 255 )
-            else
-                surface_SetDrawColor( color )
+        local skin = _G.SKIN
+        if skin ~= nil then
+            local gwen_material = skin.GwenTexture
+            if gwen_material ~= nil then
+                material = gwen_material
             end
-
-            surface_SetMaterial( material )
-
-            left, right, top, bottom = math_min( l, math_ceil( w * 0.5 ) ), math_min( r, math_floor( w * 0.5 ) ), math_min( t, math_ceil( h * 0.5 ) ), math_min( b, math_floor( h * 0.5 ) )
-            _l, _t, _r, _b = left / width, top / height, right / width, bottom / height
-
-            surface_DrawTexturedRectUV( x, y, left, top, _x, _y, _x + _l, _y + _t )
-            surface_DrawTexturedRectUV( x + left, y, w - left - right, top, _x + _l, _y, _x + _w - _r, _y + _t )
-            surface_DrawTexturedRectUV( x + w - right, y, right, top, _x + _w - _r, _y, _x + _w, _y + _t )
-            surface_DrawTexturedRectUV( x, y + top, left, h - top - bottom, _x, _y + _t, _x + _l, _y + _h - _b )
-            surface_DrawTexturedRectUV( x + left, y + top, w - left - right, h - top - bottom, _x + _l, _y + _t, _x + _w - _r, _y + _h - _b )
-            surface_DrawTexturedRectUV( x + w - right, y + top, right, h - top - bottom, _x + _w - _r, _y + _t, _x + _w, _y + _h - _b )
-            surface_DrawTexturedRectUV( x, y + h - bottom, left, bottom, _x, _y + _h - _b, _x + _l, _y + _h )
-            surface_DrawTexturedRectUV( x + left, y + h - bottom, w - left - right, bottom, _x + _l, _y + _h - _b, _x + _w - _r, _y + _h )
-
-            return surface_DrawTexturedRectUV( x + w - right, y + h - bottom, right, bottom, _x + _w - _r, _y + _h - _b, _x + _w, _y + _h )
         end
     end
 
-end
-
-function GWEN.CreateTextureNormal( _xo, _yo, _wo, _ho, material_override )
-    ---@diagnostic disable-next-line: undefined-field
-    local material = SKIN and SKIN.GwenTexture or material_override
-    if material_override and not material_override:IsError() then
-        material = material_override
-    end
-
     local texture = material:GetTexture( "$basetexture" )
-    local width, height = texture:Width(), texture:Height()
+    local texture_width, texture_height = texture:Width(), texture:Height()
 
-    local _x, _y, _w, _h = _xo / width, _yo / height, _wo / width, _ho / height
+    width_offset, height_offset = width_offset / texture_width, height_offset / texture_height
+
+    local startU = x_offset / texture_width
+    local startV = y_offset / texture_height
+
+    local left, right, top, bottom = 0, 0, 0, 0
+
+    local left_offset, right_offset = 0, 0
+    local top_offset, bottom_offset = 0, 0
+
+    local horizontal_width, vertical_height = 0, 0
+
+    local endU, endU2, endU3 = 0, 0, 0
+    local endV, endV2, endV3 = 0, 0, 0
 
     return function( x, y, w, h, color )
         if color == nil then
             surface_SetDrawColor( 255, 255, 255, 255 )
         else
-            surface_SetDrawColor( color )
-        end
-
-        surface_SetMaterial( material )
-        return surface_DrawTexturedRectUV( x, y, w, h, _x, _y, _x + _w, _y + _h )
-    end
-
-end
-
-function GWEN.CreateTextureCentered( _xo, _yo, _wo, _ho, material_override )
-    ---@diagnostic disable-next-line: undefined-field
-    local material = SKIN and SKIN.GwenTexture or material_override
-    if material_override and not material_override:IsError() then
-        material = material_override
-    end
-
-    local texture = material:GetTexture( "$basetexture" )
-    local width, height = texture:Width(), texture:Height()
-
-    local _x, _y, _w, _h = _xo / width, _yo / height, _wo / width, _ho / height
-
-    return function( x, y, w, h, color )
-        if color == nil then
-            surface_SetDrawColor( 255, 255, 255, 255 )
-        else
-            surface_SetDrawColor( color )
+            surface_SetDrawColor( color.r, color.g, color.b, color.a )
         end
 
         surface_SetMaterial( material )
 
-        x = x + ( ( w - _wo ) * 0.5 )
-        y = y + ( ( h - _ho ) * 0.5 )
+        left = math_min( l, math_ceil( w * 0.5 ) )
+        right = math_min( r, math_floor( w * 0.5 ) )
 
-        return surface_DrawTexturedRectUV( x, y, _wo, _ho, _x, _y, _x + _w, _y + _h )
+        top = math_min( t, math_ceil( h * 0.5 ) )
+        bottom = math_min( b, math_floor( h * 0.5 ) )
+
+        left_offset = x + left
+        right_offset = x + ( w - right )
+
+        top_offset = y + top
+        bottom_offset = y + ( h - bottom )
+
+        horizontal_width = w - ( left + right )
+        vertical_height = h - ( top + bottom )
+
+        endU = startU + ( left / texture_width )
+        endV = startV + ( top / texture_height )
+
+        endU2 = startU + width_offset
+        endU3 = endU2 - ( right / texture_width )
+
+        endV2 = startV + height_offset
+        endV3 = endV2 - ( bottom / texture_height )
+
+        surface_DrawTexturedRectUV( x, y, left, top, startU, startV, endU, endV )
+
+        surface_DrawTexturedRectUV( left_offset, y, horizontal_width, top, endU, startV, endU3, endV )
+        surface_DrawTexturedRectUV( right_offset, y, right, top, endU3, startV, endU2, endV )
+
+        surface_DrawTexturedRectUV( x, top_offset, left, vertical_height, startU, endV, endU, endV3 )
+
+        surface_DrawTexturedRectUV( left_offset, top_offset, horizontal_width, vertical_height, endU, endV, endU3, endV3 )
+        surface_DrawTexturedRectUV( right_offset, top_offset, right, vertical_height, endU3, endV, endU2, endV3 )
+
+        surface_DrawTexturedRectUV( x, bottom_offset, left, bottom, startU, endV3, endU, endV2 )
+
+        surface_DrawTexturedRectUV( left_offset, bottom_offset, horizontal_width, bottom, endU, endV3, endU3, endV2 )
+        surface_DrawTexturedRectUV( right_offset, bottom_offset, right, bottom, endU3, endV3, endU2, endV2 )
     end
-
 end
 
-do
-
-    local GetColor = FindMetaTable( "IMaterial" ).GetColor
-
-    function GWEN.TextureColor( x, y, material_override )
+function GWEN.CreateTextureNormal( x_offset, y_offset, width_offset, height_offset, material )
+    if material == nil or IMaterial_IsError( material ) then
         ---@diagnostic disable-next-line: undefined-field
-        local material = SKIN and SKIN.GwenTexture or material_override
-        if material_override and not material_override:IsError() then
-            material = material_override
+        local skin = _G.SKIN
+        if skin ~= nil then
+            local gwen_material = skin.GwenTexture
+            if gwen_material ~= nil then
+                material = gwen_material
+            end
+        end
+    end
+
+    local texture = material:GetTexture( "$basetexture" )
+    local texture_width, texture_height = texture:Width(), texture:Height()
+
+    local startU = x_offset / texture_width
+    local endU = startU + ( width_offset / texture_width )
+
+    local startV = y_offset / texture_height
+    local endV = startV + ( height_offset / texture_height )
+
+    return function( x, y, w, h, color )
+        if color == nil then
+            surface_SetDrawColor( 255, 255, 255, 255 )
+        else
+            surface_SetDrawColor( color.r, color.g, color.b, color.a )
         end
 
-        return GetColor( material, x, y )
+        surface_SetMaterial( material )
+        surface_DrawTexturedRectUV( x, y, w, h, startU, startV, endU, endV )
     end
 
 end
 
----@class Panel
-local PANEL = FindMetaTable( "Panel" )
+function GWEN.CreateTextureCentered( x_offset, y_offset, width_offset, height_offset, material )
+    if material == nil or IMaterial_IsError( material ) then
+        ---@diagnostic disable-next-line: undefined-field
+        local skin = _G.SKIN
+        if skin ~= nil then
+            local gwen_material = skin.GwenTexture
+            if gwen_material ~= nil then
+                material = gwen_material
+            end
+        end
+    end
+
+    local texture = material:GetTexture( "$basetexture" )
+    local texture_width, texture_height = texture:Width(), texture:Height()
+
+    local startU = x_offset / texture_width
+    local endU = startU + ( width_offset / texture_width )
+
+    local startV = y_offset / texture_height
+    local endV = startV + ( height_offset / texture_height )
+
+    return function( x, y, w, h, color )
+        if color == nil then
+            surface_SetDrawColor( 255, 255, 255, 255 )
+        else
+            surface_SetDrawColor( color.r, color.g, color.b, color.a )
+        end
+
+        surface_SetMaterial( material )
+        surface_DrawTexturedRectUV( x + ( w - width_offset ) * 0.5, y + ( h - height_offset ) * 0.5, width_offset, height_offset, startU, startV, endU, endV )
+    end
+
+end
 
 do
 
-    local SetMultiline, Add = PANEL.SetMultiline, PANEL.Add
+    local IMaterial_GetColor = IMaterial.GetColor
+
+    function GWEN.TextureColor( x, y, material )
+        if material == nil or IMaterial_IsError( material ) then
+            ---@diagnostic disable-next-line: undefined-field
+            local skin = _G.SKIN
+            if skin ~= nil then
+                local gwen_material = skin.GwenTexture
+                if gwen_material ~= nil then
+                    material = gwen_material
+                end
+            end
+        end
+
+        return IMaterial_GetColor( material, x, y )
+    end
+
+end
+
+do
+
+    local Panel_SetMultiline, Panel_Add = PANEL.SetMultiline, PANEL.Add
     local pairs = _G.pairs
 
-    local types = {
+    local classes = {
         Base = "Panel",
         Button = "DButton",
         Label = "DLabel",
@@ -152,7 +206,7 @@ do
 
     local function applyGWEN( self, tbl )
         if tbl.Type == "TextBoxMultiline" then
-            SetMultiline( self, true )
+            Panel_SetMultiline( self, true )
         end
 
         for key, value in pairs( tbl.Properties ) do
@@ -161,15 +215,14 @@ do
             end
         end
 
-        if not tbl.Children then
-            return
-        end
-
-        for _, value in pairs( tbl.Children ) do
-            if types[ value.Type ] ~= nil then
-                applyGWEN( Add( self, types[ value.Type ] ), value )
-            else
-                MsgN( "Warning: No GWEN Panel Type ", value.Type )
+        if tbl.Children ~= nil then
+            for _, value in pairs( tbl.Children ) do
+                local class_name = classes[ value.Type ]
+                if class_name == nil then
+                    MsgN( "Warning: No GWEN Panel Type ", value.Type )
+                else
+                    applyGWEN( Panel_Add( self, class_name ), value )
+                end
             end
         end
     end
@@ -178,16 +231,25 @@ do
 
     local function loadGWENString( self, json )
         local tbl = util.JSONToTable( json )
-        if tbl ~= nil and tbl.Controls ~= nil then
-            return applyGWEN( self, tbl.Controls )
+        if tbl ~= nil then
+            local controls = tbl.Controls
+            if controls ~= nil then
+                return applyGWEN( self, controls )
+            end
         end
+
+        return nil
     end
 
     PANEL.LoadGWENString = loadGWENString
 
     function PANEL:LoadGWENFile( filePath, gamePath )
         local json = file.Read( filePath, gamePath or "GAME" )
-        return json == nil and nil or loadGWENString( self, json )
+        if json ~= nil then
+            return loadGWENString( self, json )
+        end
+
+        return nil
     end
 
 end
@@ -212,25 +274,8 @@ do
 
 end
 
-do
-
-    local SetText = PANEL.SetText
-
-    function PANEL:GWEN_SetText( text )
-        return SetText( self, text )
-    end
-
-end
-
-do
-
-    local SetName = PANEL.SetName
-
-    function PANEL:GWEN_SetControlName( name )
-        return SetName( self, name )
-    end
-
-end
+PANEL.GWEN_SetText = PANEL.SetText
+PANEL.GWEN_SetControlName = PANEL.SetName
 
 do
 
@@ -288,7 +333,10 @@ do
     local SetContentAlignment = PANEL.SetContentAlignment
 
     function PANEL:GWEN_SetHorizontalAlign( key )
-        return align[ key ] and SetContentAlignment( self, align[ key ] ) or nil
+        local uint_value = align[ key ]
+        if uint_value ~= nil then
+            SetContentAlignment( self, uint_value )
+        end
     end
 
 end
@@ -306,17 +354,12 @@ do
     local Dock = PANEL.Dock
 
     function PANEL:GWEN_SetDock( key )
-        return dock[ key ] and Dock( self, dock[ key ] ) or nil
+        local uint_value = dock[ key ]
+        if uint_value ~= nil then
+            Dock( self, uint_value )
+        end
     end
 
 end
 
-do
-
-    local SetText = PANEL.SetText
-
-    function PANEL:GWEN_SetCheckboxText( tbl )
-        return SetText( self, tbl )
-    end
-
-end
+PANEL.GWEN_SetCheckboxText = PANEL.SetText

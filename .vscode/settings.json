@@ -7,11 +7,7 @@
         "include": "dofile",
         "IncludeCS": "dofile"
     },
-    "Lua.runtime.nonstandardSymbol": [
-        "continue"
-    ],
-    "Lua.diagnostics.disable": [
-        "duplicate-set-field"
-    ],
+    "Lua.runtime.nonstandardSymbol": [],
+    "Lua.diagnostics.disable": [],
     "Lua.workspace.checkThirdParty": false
 }
