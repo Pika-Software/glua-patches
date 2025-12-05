@@ -498,11 +498,10 @@ end
 
 if CLIENT or MENU then
 
+    local PANEL = FindMetaTable( "Panel" )
+    
     -- ispanel
     do
-
-        local PANEL = FindMetaTable( "Panel" )
-
         ---@param value any
         ---@return boolean
         function _G.ispanel( value )
@@ -578,6 +577,19 @@ if CLIENT or MENU then
             return is_recording
         end
 
+    end
+
+    -- faste
+    do
+        local vgui_GetHoveredPanel = vgui.GetHoveredPanel
+
+        local HOVERED = vgui_GetHoveredPanel()
+
+        PANEL.IsHovered = function(self) return HOVERED == self end
+
+        timer_Create( addon_name .. "- meta.IsHovered", 0.02, 0, function()
+            HOVERED = vgui_GetHoveredPanel()
+        end)
     end
 
 end
@@ -2091,3 +2103,4 @@ MsgC( SERVER and Color( 50, 100, 250 ) or Color( 250, 100, 50 ), "[" .. addon_na
     "I'll prevail with every battle if I'm right ♪",
     "Look at where we started and where we will end ♪"
 } ) .. "\n" )
+
