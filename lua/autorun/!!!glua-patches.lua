@@ -605,6 +605,27 @@ if CLIENT or MENU then
 
     end
 
+    -- faster ScrW ScrH etc..
+    do
+        
+        local scr_w_cache, src_h_cache = ScrW(), ScrH()
+        ScrW = function() return scr_w_cache end
+        ScrH = function() return src_h_cache end
+
+        local _640 = 1 / 640.0
+        local _480 = 1 / 480.0
+        
+        local scr_w_640, scr_h_480 = scr_w_cache * _640, src_h_cache * _480
+        ScreenScale = function(a) return a * scr_w_640 end
+        ScreenScaleH = function(a) return a * scr_h_480 end
+
+        hook.Add( "OnScreenSizeChanged", addon_name .. " - ScreenSizes", function(_, _, a, b)
+            scr_w_cache, src_h_cache = a, b
+            scr_w_640, scr_h_480 = a * _640, b * _480
+        end, PRE_HOOK )
+        
+    end
+
 end
 
 do
@@ -2123,4 +2144,5 @@ MsgC( SERVER and Color( 50, 100, 250 ) or Color( 250, 100, 50 ), "[" .. addon_na
     "I'll prevail with every battle if I'm right ♪",
     "Look at where we started and where we will end ♪"
 } ) .. "\n" )
+
 
