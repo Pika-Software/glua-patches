@@ -1,10 +1,12 @@
 local _G = _G
 
 if _G.__glua_patches then return end
+
 ---@diagnostic disable-next-line: inject-field
 _G.__glua_patches = true
 
-local addon_name = "gLua Patches v1.16.0"
+local addon_name = "gLua Patches v1.17.0"
+---@diagnostic disable: duplicate-set-field
 
 local debug, string, math, table, engine, game, util = _G.debug, _G.string, _G.math, _G.table, _G.engine, _G.game, _G.util
 local pairs, tonumber, setmetatable, FindMetaTable, rawget = _G.pairs, _G.tonumber, _G.setmetatable, _G.FindMetaTable, _G.rawget
@@ -18,7 +20,7 @@ local MENU = _G.MENU_DLL == true
 local CLIENT = _G.CLIENT == true and not MENU
 local SERVER = _G.SERVER == true and not MENU
 
--- ULib support ( I really don't like this )
+-- ULib 'support' ( I really don't like this cr*p )
 if ( CLIENT or SERVER ) and _G.file.Exists( "ulib/shared/hook.lua", "LUA" ) then
     _G.include( "ulib/shared/hook.lua" )
 end
@@ -138,8 +140,7 @@ end
 
 do
 
-    ---@type Color
-    ---@diagnostic disable-next-line: assign-type-mismatch
+    ---@class Color
     local COLOR = FindMetaTable( "Color" )
 
     ---@param value any
@@ -346,6 +347,7 @@ end
 -- isangle
 do
 
+    ---@class Angle
     local ANGLE = FindMetaTable( "Angle" )
 
     ---@param value any
@@ -359,6 +361,7 @@ end
 -- isvector
 do
 
+    ---@class Vector
     local VECTOR = FindMetaTable( "Vector" )
 
     ---@param value any
@@ -372,12 +375,13 @@ end
 -- ismatrix
 do
 
-    local MATRIX = FindMetaTable( "VMatrix" )
+    ---@class VMatrix
+    local VMATRIX = FindMetaTable( "VMatrix" )
 
     ---@param value any
     ---@return boolean
     function _G.ismatrix( value )
-        return debug_getmetatable( value ) == MATRIX
+        return debug_getmetatable( value ) == VMATRIX
     end
 
 end
@@ -498,17 +502,18 @@ end
 
 if CLIENT or MENU then
 
+    ---@class Panel
     local PANEL = FindMetaTable( "Panel" )
-    
-    -- ispanel
-    do
-        ---@param value any
-        ---@return boolean
-        function _G.ispanel( value )
-            local metatable = debug_getmetatable( value )
-            return metatable and ( metatable == PANEL or metatable.MetaID == 22 )
-        end
 
+    ---@param value any
+    ---@return boolean
+    function _G.ispanel( value )
+        if not value then return false end
+
+        local metatable = debug_getmetatable( value )
+        if metatable == nil then return false end
+
+        return metatable == PANEL or metatable.MetaID == 22
     end
 
     -- faster gui.IsConsoleVisible
@@ -522,6 +527,7 @@ if CLIENT or MENU then
             is_visible = gui_IsConsoleVisible()
         end )
 
+        ---@return boolean
         function gui.IsConsoleVisible()
             return is_visible
         end
@@ -539,6 +545,7 @@ if CLIENT or MENU then
             is_visible = gui_IsGameUIVisible()
         end )
 
+        ---@return boolean
         function gui.IsGameUIVisible()
             return is_visible
         end
@@ -556,6 +563,7 @@ if CLIENT or MENU then
             is_playing = engine_IsPlayingDemo()
         end )
 
+        ---@return boolean
         function engine.IsPlayingDemo()
             return is_playing
         end
@@ -573,23 +581,28 @@ if CLIENT or MENU then
             is_recording = engine_IsRecordingDemo()
         end )
 
+        ---@return boolean
         function engine.IsRecordingDemo()
             return is_recording
         end
 
     end
 
-    -- faste
+    -- faster vgui.GetHoveredPanel
     do
+
         local vgui_GetHoveredPanel = vgui.GetHoveredPanel
 
-        local HOVERED = vgui_GetHoveredPanel()
+        local hovered_panel = vgui_GetHoveredPanel()
 
-        PANEL.IsHovered = function(self) return HOVERED == self end
+        function PANEL:IsHovered()
+            return hovered_panel == self
+        end
 
-        timer_Create( addon_name .. "- meta.IsHovered", 0.02, 0, function()
-            HOVERED = vgui_GetHoveredPanel()
-        end)
+        timer_Create( addon_name .. "- Panel.IsHovered", 0.02, 0, function()
+            hovered_panel = vgui_GetHoveredPanel()
+        end )
+
     end
 
 end
@@ -668,9 +681,8 @@ do
 
     local string_sub = string.sub
 
-    --- Convert SteamID64 to SteamID.
-    ---@param str string: SteamID64
-    ---@return string: SteamID
+    ---@param str string
+    ---@return string
     function util.SteamIDFrom64( str )
         local account_id = math_max( 0, ( tonumber( string_sub( str, 4 ), 10 ) or 0 ) - 61197960265728 )
         return "STEAM_0:" .. ( account_id % 2 == 0 and "0" or "1" ) .. ":" .. math_floor( account_id * 0.5 )
@@ -689,8 +701,10 @@ if CLIENT or SERVER then
     ---@return boolean
     function _G.isentity( value )
         if not value then return false end
+
         local metatable = debug_getmetatable( value )
         if metatable == nil then return false end
+
         return metatable == ENTITY or metatable.MetaID == 9
     end
 
@@ -714,29 +728,31 @@ if CLIENT or SERVER then
 
     do
 
-        local isSingleplayer = game.SinglePlayer()
+        local is_singleplayer = game.SinglePlayer()
 
         ---@return boolean
         function game.SinglePlayer()
-            return isSingleplayer
+            return is_singleplayer
         end
 
     end
 
     do
 
-        local isDedicated = game.IsDedicated()
+        local is_dedicated = game.IsDedicated()
 
         ---@return boolean
         function game.IsDedicated()
-            return isDedicated
+            return is_dedicated
         end
 
-        if isDedicated then
+        if is_dedicated then
+
             ---@return boolean
             function PLAYER:IsListenServerHost()
                 return false
             end
+
         end
 
     end
@@ -1719,6 +1735,7 @@ if CLIENT or SERVER then
 
     do
 
+        ---@class Weapon
         local WEAPON = FindMetaTable( "Weapon" )
 
         function ENTITY:IsWeapon()
@@ -1729,6 +1746,7 @@ if CLIENT or SERVER then
 
     do
 
+        ---@class NPC
         local NPC = FindMetaTable( "NPC" )
 
         function ENTITY:IsNPC()
@@ -1739,6 +1757,7 @@ if CLIENT or SERVER then
 
     do
 
+        ---@class NextBot
         local NEXTBOT = FindMetaTable( "NextBot" )
 
         function ENTITY:IsNextbot()
@@ -2093,10 +2112,11 @@ if CLIENT or SERVER then
 end
 
 MsgC( SERVER and Color( 50, 100, 250 ) or Color( 250, 100, 50 ), "[" .. addon_name .. "] ", _G.color_white, table.Random( {
-    "Here For You ♪",
     "Patched!",
-    "Thanks for installation <3",
+    "Here For You ♪",
     "Increasing performance!",
+    "Thanks for installation <3",
+    "We jump and touch the light ♪",
     "Sometimes we just need more cache :>",
     "When everything is wrong, we move along ♪",
     "Move along, move along like I know ya do ♪",
