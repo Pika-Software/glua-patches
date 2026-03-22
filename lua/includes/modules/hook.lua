@@ -510,7 +510,7 @@ local function call( event_name, tbl, ... )
 				local n_a, n_b, n_c, n_d, n_e, n_f = normal_fns[ index ]( ... )
 				if n_a ~= nil then
 					a, b, c, d, e, f = n_a, n_b, n_c, n_d, n_e, n_f
-					hook_name = normal_identifiers[ index ]
+					hook_name = normal_identifiers[ event_name ][ index ]
 					break
 				end
 			end
