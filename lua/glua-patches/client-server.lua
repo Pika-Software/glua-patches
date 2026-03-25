@@ -496,11 +496,12 @@ do
         return player_to_uid[ self ]
     end
 
+    local player_is_bot
 
     if CLIENT then
 
         ---@type table<Player, boolean>
-        local player_is_bot = {}
+        player_is_bot = {}
 
         setmetatable( player_is_bot, {
             __index = function( self, pl )
@@ -575,33 +576,8 @@ do
         return player_to_steamid64[ self ]
     end
 
-    do
-
-        ---@type table<integer, Player>
-        local accountid2player = {}
-
-        local PLAYER_AccountID = PLAYER.AccountID
-
-        setmetatable( accountid2player, {
-            __index = function( _, key )
-                for _, pl in player.Iterator() do
-                    if PLAYER_AccountID( pl ) == key then
-                        accountid2player[ key ] = pl
-                        return pl
-                    end
-                end
-            end,
-            __mode = "v"
-        } )
-
-        function player.GetByAccountID( accountid )
-            return accountid2player[ accountid ] or false
-        end
-
-    end
-
     ---@type table<Player, string>
-    local player2nick = {}
+    local player_to_nick = {}
 
     do
 
@@ -610,25 +586,25 @@ do
         local nicknames_metatable = {
             __index = function( _, pl )
                 local nickname = PLAYER_Nick( pl )
-                player2nick[ pl ] = nickname
+                player_to_nick[ pl ] = nickname
                 return nickname
             end,
             __mode = "k"
         }
 
-        setmetatable( player2nick, nicknames_metatable )
+        setmetatable( player_to_nick, nicknames_metatable )
 
         if CLIENT then
 
             timer.Create( "glua.Patches - Player name re-cache", 3, 0, function()
-                player2nick = {}
-                setmetatable( player2nick, nicknames_metatable )
+                player_to_nick = {}
+                setmetatable( player_to_nick, nicknames_metatable )
             end )
 
         end
 
         local function get_name( pl )
-            return player2nick[ pl ]
+            return player_to_nick[ pl ]
         end
 
         PLAYER.GetName = get_name
@@ -641,7 +617,46 @@ do
     end
 
     hook_Add( "OnEntityCreated", "glua.Patches - Entity & player cache", invalidateInternalEntityCache, PRE_HOOK )
-    hook_Add( "EntityRemoved", "glua.Patches - Entity & player cache", invalidateInternalEntityCache, PRE_HOOK )
+
+    ---@type Entity[]
+    local cleanup_queue = { [ 0 ] = 0 }
+
+    hook_Add( "Tick", "glua.Patches - Entity & player cache", function()
+        local queue_size = cleanup_queue[ 0 ]
+        if queue_size == 0 then return end
+
+        for i = 1, queue_size, 1 do
+            ---@type Entity
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            local entity = cleanup_queue[ i ]
+            if entity ~= nil then
+                entity_to_class[ entity ] = nil
+                entity_to_index[ entity ] = nil
+
+                if entity:IsPlayer() then
+                    player_to_nick[ entity ] = nil
+                    player_to_uid[ entity ] = nil
+
+                    player_to_steamid[ entity ] = nil
+                    player_to_steamid64[ entity ] = nil
+
+                    if CLIENT then
+                        player_is_bot[ entity ] = nil
+                    end
+                end
+            end
+        end
+
+        cleanup_queue = { [ 0 ] = 0 }
+    end, PRE_HOOK )
+
+    hook_Add( "EntityRemoved", "glua.Patches - Entity & player cache", function( entity )
+        invalidateInternalEntityCache( entity )
+
+        local queue_size = cleanup_queue[ 0 ] + 1
+        cleanup_queue[ queue_size ] = entity
+        cleanup_queue[ 0 ] = queue_size
+    end, PRE_HOOK )
 
 end
 

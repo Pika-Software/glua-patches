@@ -4,7 +4,7 @@ if glua_patches ~= nil then return end
 ---@diagnostic disable: duplicate-set-field
 ---@diagnostic disable-next-line: lowercase-global
 glua_patches = glua_patches or {}
-glua_patches.Version = "1.19.0"
+glua_patches.Version = "1.20.0"
 
 local bit = bit
 local table = table
