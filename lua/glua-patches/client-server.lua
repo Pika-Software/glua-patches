@@ -9,9 +9,7 @@ local setmetatable = setmetatable
 local GetConVar = GetConVar
 
 local timer_Simple = timer.Simple
-local timer_Create = timer.Create
 local string_byte = string.byte
-local pairs = pairs
 
 local game = game
 
@@ -35,20 +33,51 @@ local NEXTBOT = FindMetaTable( "NextBot" )
 ---@class ConVar
 local CONVAR = FindMetaTable( "ConVar" )
 
-function ENTITY:IsPlayer()
-    return debug_getmetatable( self ) == PLAYER
-end
+---@class Vehicle
+local VEHICLE = FindMetaTable( "Vehicle" )
 
-function ENTITY:IsWeapon()
-    return debug_getmetatable( self ) == WEAPON
-end
+-- by https://github.com/Astralcircle
+do
 
-function ENTITY:IsNPC()
-    return debug_getmetatable( self ) == NPC
-end
+    local return_true = function() return true end
+    local return_false = function() return false end
 
-function ENTITY:IsNextbot()
-    return debug_getmetatable( self ) == NEXTBOT
+    ENTITY.IsNextBot = return_false
+    ENTITY.IsNPC = return_false
+    ENTITY.IsPlayer = return_false
+    ENTITY.IsVehicle = return_false
+    ENTITY.IsWeapon = return_false
+
+    NEXTBOT.IsNextBot = return_true
+    NEXTBOT.IsNPC = return_false
+    NEXTBOT.IsPlayer = return_false
+    NEXTBOT.IsVehicle = return_false
+    NEXTBOT.IsWeapon = return_false
+
+    NPC.IsNextBot = return_false
+    NPC.IsNPC = return_true
+    NPC.IsPlayer = return_false
+    NPC.IsVehicle = return_false
+    NPC.IsWeapon = return_false
+
+    PLAYER.IsNextBot = return_false
+    PLAYER.IsNPC = return_false
+    PLAYER.IsPlayer = return_true
+    PLAYER.IsVehicle = return_false
+    PLAYER.IsWeapon = return_false
+
+    VEHICLE.IsNextBot = return_false
+    VEHICLE.IsNPC = return_false
+    VEHICLE.IsPlayer = return_false
+    VEHICLE.IsVehicle = return_true
+    VEHICLE.IsWeapon = return_false
+
+    WEAPON.IsNextBot = return_false
+    WEAPON.IsNPC = return_false
+    WEAPON.IsPlayer = return_false
+    WEAPON.IsVehicle = return_false
+    WEAPON.IsWeapon = return_true
+
 end
 
 do
@@ -359,9 +388,6 @@ do
 
 end
 
-local gc_key = { __mode = "k" }
-local gc_value = { __mode = "v" }
-
 if CLIENT then
 
     local LocalPlayer = _G.LocalPlayer
@@ -629,7 +655,9 @@ do
 
     local trace = {}
 
-    setmetatable( trace, gc_value )
+    setmetatable( trace, {
+        __mode = "v"
+    } )
 
     function util.GetPlayerTrace( pl, dir )
         local start = pl:EyePos()
