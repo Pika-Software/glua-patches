@@ -2,12 +2,10 @@ if CLIENT then
 
     local changeConvarList = {
         ['cl_threaded_bone_setup'] = '1',
-        ['cl_threaded_client_leaf_system'] = '1',
 
         ['r_queued_ropes'] = '1',
         ['studio_queue_mode'] = '1',
 
-        ['cl_forcepreload'] = '1',
         ['r_fastzreject'] = '1',
     }
 
