@@ -503,7 +503,7 @@ local function dispatch( event_name, tbl, ... )
     local normal_fns = normal_functions[ event_name ]
     if normal_fns ~= nil then
         local returnless = normal_returnless[ event_name ]
-        for index = 1, normal_counts[ event_name ], 1 do
+        for index = normal_counts[ event_name ], 1, -1 do
             if returnless[ index ] then
                 normal_fns[ index ]( ... )
             else
@@ -527,7 +527,7 @@ local function dispatch( event_name, tbl, ... )
 
     local post_return_fns = post_return_functions[ event_name ]
     if post_return_fns ~= nil then
-        for index = 1, post_return_counts[ event_name ], 1 do
+        for index = post_return_counts[ event_name ], 1, -1 do
             local n_a, n_b, n_c, n_d, n_e, n_f = post_return_fns[ index ]( { hook_name, a, b, c, d, e, f }, ... )
             if n_a ~= nil then
                 a, b, c, d, e, f = n_a, n_b, n_c, n_d, n_e, n_f
@@ -540,34 +540,12 @@ local function dispatch( event_name, tbl, ... )
     if post_fns ~= nil then
         local returned_values = { hook_name, a, b, c, d, e, f }
 
-        for index = 1, post_counts[ event_name ], 1 do
+        for index = post_counts[ event_name ], 1, -1 do
             post_fns[ index ]( returned_values, ... )
         end
     end
 
     return a, b, c, d, e, f
-end
-
-local function flush_queue()
-    in_call = false
-
-    if not has_changes then return end
-
-    has_changes = false
-
-    for i = 1, queue_size, 1 do
-        local action = queue[ i ]
-
-        if action[ 1 ] then
-            add( action[ 2 ], action[ 3 ], action[ 4 ], action[ 5 ] )
-        else
-            remove( action[ 2 ], action[ 3 ] )
-        end
-
-        queue[ i ] = nil
-    end
-
-    queue_size = 0
 end
 
 local function call( event_name, tbl, ... )
@@ -583,7 +561,24 @@ local function call( event_name, tbl, ... )
     in_call = true
 
     local ok, a, b, c, d, e, f = pcall( dispatch, event_name, tbl, ... )
-    flush_queue()
+
+    in_call = false
+
+    if has_changes then
+        has_changes = false
+
+        for i = 1, queue_size, 1 do
+            local action = queue[ i ]
+
+            if action[ 1 ] then
+                add( action[ 2 ], action[ 3 ], action[ 4 ], action[ 5 ] )
+            else
+                remove( action[ 2 ], action[ 3 ] )
+            end
+        end
+
+        queue, queue_size = {}, 0
+    end
 
     if not ok then
         error( a, 0 )
