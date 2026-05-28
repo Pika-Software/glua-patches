@@ -610,50 +610,50 @@ function Run( name, ... )
     return call( name, gamemode_cache, ... )
 end
 
-if file.Exists( "ulib/shared/hook.lua", "LUA" ) then
+-- if file.Exists( "ulib/shared/hook.lua", "LUA" ) then
 
-    function GetULibTable()
-        local output = {}
+--     function GetULibTable()
+--         local output = {}
 
-        for event_name in pairs( event_exists ) do
-            local hooks = {
-                [ -2 ] = {}, -- HOOK_MONITOR_HIGH
-                [ -1 ] = {}, -- HOOK_HIGH
-                [ 0 ] = {},  -- HOOK_NORMAL
-                [ 1 ] = {},  -- HOOK_LOW
-                [ 2 ] = {},  -- HOOK_MONITOR_LOW
-            }
+--         for event_name in pairs( event_exists ) do
+--             local hooks = {
+--                 [ -2 ] = {}, -- HOOK_MONITOR_HIGH
+--                 [ -1 ] = {}, -- HOOK_HIGH
+--                 [ 0 ] = {},  -- HOOK_NORMAL
+--                 [ 1 ] = {},  -- HOOK_LOW
+--                 [ 2 ] = {},  -- HOOK_MONITOR_LOW
+--             }
 
-            local normal_fns = normal_real_functions[ event_name ]
-            if normal_fns ~= nil then
-                local returnless = normal_returnless[ event_name ]
-                for i = 1, normal_counts[ event_name ], 1 do
-                    if returnless[ i ] then
-                        hooks[ -2 ][ normal_identifiers[ event_name ][ i ] ] = normal_fns[ i ]
-                    else
-                        hooks[ 0 ][ normal_identifiers[ event_name ][ i ] ] = normal_fns[ i ]
-                    end
-                end
-            end
+--             local normal_fns = normal_real_functions[ event_name ]
+--             if normal_fns ~= nil then
+--                 local returnless = normal_returnless[ event_name ]
+--                 for i = 1, normal_counts[ event_name ], 1 do
+--                     if returnless[ i ] then
+--                         hooks[ -2 ][ normal_identifiers[ event_name ][ i ] ] = normal_fns[ i ]
+--                     else
+--                         hooks[ 0 ][ normal_identifiers[ event_name ][ i ] ] = normal_fns[ i ]
+--                     end
+--                 end
+--             end
 
-            local post_return_fns = post_return_real_functions[ event_name ]
-            if post_return_fns ~= nil then
-                for i = 1, post_return_counts[ event_name ], 1 do
-                    hooks[ 1 ][ post_return_identifiers[ event_name ][ i ] ] = post_return_fns[ i ]
-                end
-            end
+--             local post_return_fns = post_return_real_functions[ event_name ]
+--             if post_return_fns ~= nil then
+--                 for i = 1, post_return_counts[ event_name ], 1 do
+--                     hooks[ 1 ][ post_return_identifiers[ event_name ][ i ] ] = post_return_fns[ i ]
+--                 end
+--             end
 
-            local post_fns = post_real_functions[ event_name ]
-            if post_fns ~= nil then
-                for i = 1, post_counts[ event_name ], 1 do
-                    hooks[ 2 ][ post_identifiers[ event_name ][ i ] ] = post_fns[ i ]
-                end
-            end
+--             local post_fns = post_real_functions[ event_name ]
+--             if post_fns ~= nil then
+--                 for i = 1, post_counts[ event_name ], 1 do
+--                     hooks[ 2 ][ post_identifiers[ event_name ][ i ] ] = post_fns[ i ]
+--                 end
+--             end
 
-            output[ event_name ] = hooks
-        end
+--             output[ event_name ] = hooks
+--         end
 
-        return output
-    end
+--         return output
+--     end
 
-end
+-- end
