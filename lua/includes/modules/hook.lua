@@ -508,7 +508,7 @@ local function call( event_name, tbl, ... )
     local normal_fns = normal_functions[ event_name ]
     if normal_fns ~= nil then
         local returnless = normal_returnless[ event_name ]
-        for index = normal_counts[ event_name ], 1, -1 do
+        for index = 1, normal_counts[ event_name ], 1 do
             if returnless[ index ] then
                 normal_fns[ index ]( ... )
             else
@@ -532,7 +532,7 @@ local function call( event_name, tbl, ... )
 
     local post_return_fns = post_return_functions[ event_name ]
     if post_return_fns ~= nil then
-        for index = post_return_counts[ event_name ], 1, -1 do
+        for index = 1, post_return_counts[ event_name ], 1 do
             local n_a, n_b, n_c, n_d, n_e, n_f = post_return_fns[ index ]( { hook_name, a, b, c, d, e, f }, ... )
             if n_a ~= nil then
                 a, b, c, d, e, f = n_a, n_b, n_c, n_d, n_e, n_f
@@ -545,7 +545,7 @@ local function call( event_name, tbl, ... )
     if post_fns ~= nil then
         local returned_values = { hook_name, a, b, c, d, e, f }
 
-        for index = post_counts[ event_name ], 1, -1 do
+        for index = 1, post_counts[ event_name ], 1 do
             post_fns[ index ]( returned_values, ... )
         end
     end
