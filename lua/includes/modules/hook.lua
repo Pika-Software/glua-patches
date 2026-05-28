@@ -17,7 +17,6 @@ local isstring = isstring
 local isnumber = isnumber
 local isbool = isbool
 
--- this is for addons that think every server only has ulx and supplies numbers for priorities instead of using the constants
 HOOK_MONITOR_HIGH = -2
 HOOK_HIGH = -1
 HOOK_NORMAL = 0
@@ -25,6 +24,7 @@ HOOK_LOW = 1
 HOOK_MONITOR_LOW = 2
 
 do
+
     ---@type table<userdata, string>
     local names = {}
 
@@ -87,6 +87,7 @@ do
 
     ---@class hook.PostPriority : userdata
     POST_HOOK = create_proxy( "POST_HOOK", 4 )
+
 end
 
 ---@alias hook.Priority hook.PrePriority | hook.PreReturnPriority | hook.NormalPriority | hook.PostReturnPriority | hook.PostPriority
@@ -336,15 +337,21 @@ local function add( event_name, identifier, fn, priority )
         ---@cast priority integer
         priority = ulx2priorities[ math_clamp( math_floor( priority ), -2, 2 ) ]
 
-        if priority == PRE_HOOK_RETURN then
+        --[[if priority == PRE_HOOK_RETURN then
             local main_fn = fn
             fn = function( ... )
                 return main_fn( ... )
             end
-        elseif priority == POST_HOOK or priority == POST_HOOK_RETURN then
+        else--]]
+        if priority == POST_HOOK then
             local main_fn = fn
             fn = function( _, ... )
                 main_fn( ... )
+            end
+        elseif priority == POST_HOOK_RETURN then
+            local main_fn = fn
+            fn = function( _, ... )
+                return main_fn( ... )
             end
         end
     elseif hook_priorities[ priority ] == nil then
@@ -579,8 +586,7 @@ function Run( name, ... )
 end
 
 if file.Exists( "ulib/shared/hook.lua", "LUA" ) then
-    -- this could make an issue with addons that retrieve all hooks and call them, as POST_HOOK(_RETURN)
-    -- will be called randomly and their first argument won't be the "returned values" table
+
     function GetULibTable()
         local output = {}
 
@@ -624,4 +630,5 @@ if file.Exists( "ulib/shared/hook.lua", "LUA" ) then
 
         return output
     end
+
 end
