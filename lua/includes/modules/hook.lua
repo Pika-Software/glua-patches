@@ -17,6 +17,9 @@ local isstring = isstring
 local isnumber = isnumber
 local isbool = isbool
 
+local pcall = pcall
+local error = error
+
 HOOK_MONITOR_HIGH = -2
 HOOK_HIGH = -1
 HOOK_NORMAL = 0
@@ -490,18 +493,10 @@ end
 
 Add = add
 
-local function call( event_name, tbl, ... )
-    if event_exists[ event_name ] == nil then
-        if tbl == nil then return end
-
-        local fn = tbl[ event_name ]
-        if fn == nil then return end
-
-        return fn( tbl, ... )
-    end
-
-    in_call = true
-
+---@param event_name string
+---@param tbl table
+---@param ... any
+local function dispatch( event_name, tbl, ... )
     local a, b, c, d, e, f
     local hook_name
 
@@ -536,7 +531,7 @@ local function call( event_name, tbl, ... )
             local n_a, n_b, n_c, n_d, n_e, n_f = post_return_fns[ index ]( { hook_name, a, b, c, d, e, f }, ... )
             if n_a ~= nil then
                 a, b, c, d, e, f = n_a, n_b, n_c, n_d, n_e, n_f
-                hook_name = post_return_identifiers[ index ]
+                hook_name = post_return_identifiers[ event_name ][ index ]
             end
         end
     end
@@ -550,24 +545,48 @@ local function call( event_name, tbl, ... )
         end
     end
 
+    return a, b, c, d, e, f
+end
+
+local function flush_queue()
     in_call = false
 
-    if has_changes then
-        has_changes = false
+    if not has_changes then return end
 
-        for i = 1, queue_size, 1 do
-            local action = queue[ i ]
+    has_changes = false
 
-            if action[ 1 ] then
-                add( action[ 2 ], action[ 3 ], action[ 4 ], action[ 5 ] )
-            else
-                remove( action[ 2 ], action[ 3 ] )
-            end
+    for i = 1, queue_size, 1 do
+        local action = queue[ i ]
 
-            queue[ i ] = nil
+        if action[ 1 ] then
+            add( action[ 2 ], action[ 3 ], action[ 4 ], action[ 5 ] )
+        else
+            remove( action[ 2 ], action[ 3 ] )
         end
 
-        queue_size = 0
+        queue[ i ] = nil
+    end
+
+    queue_size = 0
+end
+
+local function call( event_name, tbl, ... )
+    if event_exists[ event_name ] == nil then
+        if tbl == nil then return end
+
+        local fn = tbl[ event_name ]
+        if fn == nil then return end
+
+        return fn( tbl, ... )
+    end
+
+    in_call = true
+
+    local ok, a, b, c, d, e, f = pcall( dispatch, event_name, tbl, ... )
+    flush_queue()
+
+    if not ok then
+        error( a, 0 )
     end
 
     return a, b, c, d, e, f
