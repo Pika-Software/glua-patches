@@ -378,7 +378,7 @@ local function add( event_name, identifier, fn, priority )
             post_identifiers[ event_name ] = identifiers
         end
 
-        table_insert( identifiers, index, identifier )
+        table_insert( identifiers, 1, identifier )
 
         local fns = post_functions[ event_name ]
         if fns == nil then
@@ -386,7 +386,7 @@ local function add( event_name, identifier, fn, priority )
             post_functions[ event_name ] = fns
         end
 
-        table_insert( fns, index, fn )
+        table_insert( fns, 1, fn )
 
         local rfns = post_real_functions[ event_name ]
         if rfns == nil then
@@ -394,7 +394,7 @@ local function add( event_name, identifier, fn, priority )
             post_real_functions[ event_name ] = rfns
         end
 
-        table_insert( rfns, index, orignal_fn )
+        table_insert( rfns, 1, orignal_fn )
         return
     end
 
@@ -408,7 +408,7 @@ local function add( event_name, identifier, fn, priority )
             post_return_identifiers[ event_name ] = identifiers
         end
 
-        table_insert( identifiers, index, identifier )
+        table_insert( identifiers, 1, identifier )
 
         local fns = post_return_functions[ event_name ]
         if fns == nil then
@@ -416,7 +416,7 @@ local function add( event_name, identifier, fn, priority )
             post_return_functions[ event_name ] = fns
         end
 
-        table_insert( fns, index, fn )
+        table_insert( fns, 1, fn )
 
         local rfns = post_return_real_functions[ event_name ]
         if rfns == nil then
@@ -424,7 +424,7 @@ local function add( event_name, identifier, fn, priority )
             post_return_real_functions[ event_name ] = rfns
         end
 
-        table_insert( rfns, index, orignal_fn )
+        table_insert( rfns, 1, orignal_fn )
         return
     end
 
@@ -437,7 +437,7 @@ local function add( event_name, identifier, fn, priority )
     local count = normal_counts[ event_name ] or 0
     local index = count == 0 and 1 or 0
 
-    for i = 1, count, 1 do
+    for i = count, 1, -1 do
         local value = priorities[ i ]
         if value > priority then
             index = i
