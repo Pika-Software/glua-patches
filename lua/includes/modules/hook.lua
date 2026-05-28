@@ -589,6 +589,17 @@ end
 
 Call = call
 
+function Debug()
+    print( "\nnormal_identifiers:" )
+    PrintTable( normal_identifiers )
+
+    print( "\npost_identifiers:" )
+    PrintTable( post_identifiers )
+
+    print( "\npost_return_identifiers:" )
+    PrintTable( post_return_identifiers )
+end
+
 local gamemode_cache
 
 function Run( name, ... )
