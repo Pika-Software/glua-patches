@@ -506,9 +506,13 @@ do
 
         setmetatable( player_is_bot, {
             __index = function( self, pl )
-                local is_bot = ENTITY_IsValid( pl ) and PLAYER_IsBot( pl )
-                self[ pl ] = is_bot
-                return is_bot
+                if ENTITY_IsValid( pl ) then
+                    local is_bot = PLAYER_IsBot( pl )
+                    self[ pl ] = is_bot
+                    return is_bot
+                end
+
+                return false
             end,
             __mode = "k"
         } )
@@ -560,7 +564,7 @@ do
                 local value
 
                 if PLAYER_IsBot( pl ) then
-                    value = "765" .. ((player_to_uid[ pl ] * 2) + 61197960265728)     -- fake steamid for bots
+                    value = "765" .. ((player_to_uid[ pl ] * 2) + 61197960265728) -- fake steamid for bots
                 else
                     value = PLAYER_SteamID64( pl )
                 end
