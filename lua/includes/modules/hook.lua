@@ -434,12 +434,12 @@ local function add( event_name, identifier, fn, priority )
     local count = normal_counts[ event_name ] or 0
     local index = count == 0 and 1 or 0
 
-    for i = 1, count, 1 do
-        local value = priorities[ i ]
-        if value > priority then
+    for i = count, 1, -1 do
+        local other_priority = priorities[ i ]
+        if other_priority < priority then
             index = i
             break
-        elseif value == priority then
+        elseif other_priority == priority then
             index = i + 1
             break
         end
