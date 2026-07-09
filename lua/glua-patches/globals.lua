@@ -4,7 +4,7 @@ if glua_patches ~= nil then return end
 ---@diagnostic disable: duplicate-set-field
 ---@diagnostic disable-next-line: lowercase-global
 glua_patches = glua_patches or {}
-glua_patches.Version = "1.20.0"
+glua_patches.Version = "1.20.1"
 
 local bit = bit
 local table = table
@@ -106,6 +106,7 @@ do
 
         timer.Create( "glua.Patches - system.HasFocus", 0.05, 0, function()
             if system_HasFocus() == has_focus then return end
+
             has_focus = not has_focus
         end )
 
@@ -207,6 +208,7 @@ do
         local end_time = CurTime() + seconds
         while true do
             if end_time < CurTime() then return end
+
             coroutine_yield()
         end
     end
@@ -224,6 +226,7 @@ do
         __index = function( self, name )
             local value = GetConVar_Internal( name )
             if value == nil then return nil end
+
             self[ name ] = value
             return value
         end
@@ -243,7 +246,7 @@ do
     ---@param high number
     ---@return number
     local function math_Rand( low, high )
-        return low + ( high - low ) * math_random()
+        return low + (high - low) * math_random()
     end
 
     math.Rand = math_Rand
@@ -285,7 +288,7 @@ do
     ---@return string
     function util.SteamIDTo64( str )
         local x, y, z = string_match( str, "STEAM_([0-5]):([01]):(%d+)" )
-        return x == nil and "0" or ( "765" .. ( ( tonumber( z, 10 ) * 2 ) + 61197960265728 ) + ( y == "1" and 1 or 0 ) )
+        return x == nil and "0" or ("765" .. ((tonumber( z, 10 ) * 2) + 61197960265728) + (y == "1" and 1 or 0))
     end
 
 end
@@ -297,8 +300,8 @@ do
     ---@param str string
     ---@return string
     function util.SteamIDFrom64( str )
-        local account_id = math_max( 0, ( tonumber( string_sub( str, 4 ), 10 ) or 0 ) - 61197960265728 )
-        return "STEAM_0:" .. ( account_id % 2 == 0 and "0" or "1" ) .. ":" .. math_floor( account_id * 0.5 )
+        local account_id = math_max( 0, (tonumber( string_sub( str, 4 ), 10 ) or 0) - 61197960265728 )
+        return "STEAM_0:" .. (account_id % 2 == 0 and "0" or "1") .. ":" .. math_floor( account_id * 0.5 )
     end
 
 end
