@@ -1,6 +1,6 @@
 ---@diagnostic disable: duplicate-set-field
 
-local gameevent_Listen = ( gameevent ~= nil and isfunction( gameevent.Listen ) ) and gameevent.Listen
+local gameevent_Listen = (gameevent ~= nil and isfunction( gameevent.Listen )) and gameevent.Listen
 local debug_getmetatable = debug.getmetatable or getmetatable
 local hook_Add, hook_Remove = hook.Add, hook.Remove
 
@@ -322,6 +322,7 @@ if CLIENT then
 
             hook_Add( "StartChat", "glua.Patches - cl_drawhud chat fix", function()
                 if GetBool( cl_drawhud ) then return end
+
                 chat_Close()
                 return true
                 ---@diagnostic disable-next-line: redundant-parameter
@@ -505,9 +506,13 @@ do
 
         setmetatable( player_is_bot, {
             __index = function( self, pl )
-                local is_bot = PLAYER_IsBot( pl )
-                self[ pl ] = is_bot
-                return is_bot
+                if ENTITY_IsValid( pl ) then
+                    local is_bot = PLAYER_IsBot( pl )
+                    self[ pl ] = is_bot
+                    return is_bot
+                end
+
+                return false
             end,
             __mode = "k"
         } )
@@ -559,7 +564,7 @@ do
                 local value
 
                 if PLAYER_IsBot( pl ) then
-                    value = "765" .. ( ( player_to_uid[ pl ] * 2 ) + 61197960265728 ) -- fake steamid for bots
+                    value = "765" .. ((player_to_uid[ pl ] * 2) + 61197960265728) -- fake steamid for bots
                 else
                     value = PLAYER_SteamID64( pl )
                 end
@@ -679,7 +684,7 @@ do
 
         return {
             start = start,
-            endpos = start + ( ( dir or pl:GetAimVector() ) * distance ),
+            endpos = start + ((dir or pl:GetAimVector()) * distance),
             filter = pl
         }
     end
@@ -704,7 +709,7 @@ do
         local start = self:EyePos()
 
         trace.start = start
-        trace.endpos = start + ( self:GetAimVector() * distance )
+        trace.endpos = start + (self:GetAimVector() * distance)
         trace.filter = self
 
         local traceResult = TraceLine( trace )
@@ -724,7 +729,7 @@ do
         local start = self:EyePos()
 
         trace.start = start
-        trace.endpos = start + ( self:EyeAngles():Forward() * distance )
+        trace.endpos = start + (self:EyeAngles():Forward() * distance)
         trace.filter = self
 
         local traceResult = TraceLine( trace )
@@ -742,6 +747,7 @@ do
 
     hook_Add( "PlayerFootstep", "glua.Patches - No more fake footsteps", function( pl )
         if not ENTITY_IsOnGround( pl ) and ENTITY_GetMoveType( pl ) ~= MOVETYPE_LADDER then return true end
+
         ---@diagnostic disable-next-line: redundant-parameter
     end, PRE_HOOK_RETURN )
 
@@ -774,7 +780,7 @@ if SERVER then
 
     -- Level reload command
     _G.concommand.Add( "reloadlevel", function( pl )
-        if ( pl and pl:IsValid() ) and not ( pl:IsSuperAdmin() or pl:IsListenServerHost() ) then
+        if (pl and pl:IsValid()) and not (pl:IsSuperAdmin() or pl:IsListenServerHost()) then
             pl:ChatPrint( "You don\'t have permission to use this command." )
             return
         end
@@ -793,6 +799,7 @@ if SERVER then
 
             hook_Add( "PlayerInitialSpawn", "glua.Patches - License check", function( pl )
                 if GetBool( sv_lan ) or PLAYER_IsBot( pl ) or pl:IsListenServerHost() or pl:IsFullyAuthenticated() then return end
+
                 pl:Kick( "Your SteamID wasn\'t fully authenticated, try restart your Steam client." )
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
@@ -837,6 +844,7 @@ if SERVER then
                         ENTITY_Fire( portal, "open" )
                     end
                 end
+
                 ---@diagnostic disable-next-line: redundant-parameter
             end, PRE_HOOK )
         end
@@ -869,6 +877,7 @@ if SERVER then
                 entity:PhysicsInit( SOLID_VPHYSICS )
                 entity:PhysWake()
             end
+
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )
 
@@ -883,6 +892,7 @@ if SERVER then
         hook_Add( "EntityTakeDamage", "glua.Patches - prop_vehicle_prisoner_pod damage fix", function( entity, damageInfo )
             ---@diagnostic disable-next-line: undefined-field
             if entity:GetClass() ~= "prop_vehicle_prisoner_pod" or entity.AcceptDamageForce then return end
+
             ENTITY_TakePhysicsDamage( entity, damageInfo )
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )

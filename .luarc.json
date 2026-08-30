@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/LLS-Addons/main/schemas/addon_config.schema.json",
+  "name": "garrysmod",
+  "words": ["include%s*%(?", "AddCSLuaFile%s*%(?", "hook%.Add%s*%("],
+  "settings": {
+    "Lua.runtime.version": "LuaJIT",
+    "Lua.runtime.special": {
+      "include": "dofile",
+      "IncludeCS": "dofile"
+    },
+    "Lua.runtime.nonstandardSymbol": [
+      "!",
+      "!=",
+      "&&",
+      "||",
+      "//",
+      "/**/",
+      "continue"
+    ],
+    "Lua.diagnostics.disable": ["duplicate-set-field", "lowercase-global"]
+  },
+  "format.enable": true,
+  "workspace.library": ["~/.lib/glua-api-snippets/library"]
+}
