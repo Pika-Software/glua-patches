@@ -310,6 +310,212 @@ if CLIENT then
 
     end
 
+    -- Screen size caching ( https://github.com/Pika-Software/glua-patches/pull/18 )
+    -- ScrW/ScrH are contextual: they return the size of the CURRENT viewport, not the screen.
+    -- A naive cache therefore corrupts anything that draws inside a custom viewport
+    -- ( render targets, cam.Start with x/y/w/h, render.SetViewPort ).
+    -- This version tracks the viewport and only serves the cache at the top level.
+    do
+
+        local CONVAR_GetBool = CONVAR.GetBool
+
+        ---@type ConVar
+        ---@diagnostic disable-next-line: param-type-mismatch
+        local gp_cache_screen_size = CreateConVar( "gp_cache_screen_size", "1", FCVAR_ARCHIVE, "Cache the results of ScrW/ScrH/ScreenScale/ScreenScaleH outside of custom viewports." )
+
+        local enabled = CONVAR_GetBool( gp_cache_screen_size )
+
+        local ScrW, ScrH = _G.ScrW, _G.ScrH
+        local ScreenScale = _G.ScreenScale
+
+        local width, height = ScrW(), ScrH()
+        local width_640, height_480 = width / 640.0, height / 480.0
+
+        -- How many viewport-changing contexts we are currently inside of.
+        local depth = 0
+
+        -- Set when render.SetViewPort was given something other than the full screen.
+        -- It is unbalanced ( there is no matching "restore" call ), so it cannot be counted.
+        local overridden = false
+
+        -- ScrW/ScrH
+        do
+
+            function _G.ScrW()
+                if enabled and depth == 0 and not overridden then
+                    return width
+                end
+
+                return ScrW()
+            end
+
+            function _G.ScrH()
+                if enabled and depth == 0 and not overridden then
+                    return height
+                end
+
+                return ScrH()
+            end
+
+            function _G.ScreenScale( size )
+                if enabled and depth == 0 and not overridden then
+                    return size * width_640
+                end
+
+                return size * ( ScrW() / 640.0 )
+            end
+
+            function _G.ScreenScaleH( size )
+                if enabled and depth == 0 and not overridden then
+                    return size * height_480
+                end
+
+                return size * ( ScrH() / 480.0 )
+            end
+
+            -- SScale is assigned at load time in garrysmod/lua/includes/extensions/client/globals.lua,
+            -- so it still points at the original ScreenScale. Only replace it if nothing else took it.
+            if _G.SScale == ScreenScale then
+                _G.SScale = _G.ScreenScale
+            end
+
+            -- Deprecated aliases of ScrW/ScrH, still used by plenty of older addons.
+            -- Pointing them at the wrappers above gives them the same cache and the same guard.
+            local surface = _G.surface
+
+            if surface.ScreenWidth ~= nil then
+                surface.ScreenWidth = _G.ScrW
+            end
+
+            if surface.ScreenHeight ~= nil then
+                surface.ScreenHeight = _G.ScrH
+            end
+
+        end
+
+        -- Viewport tracking
+        do
+
+            local cam, render = _G.cam, _G.render
+
+            -- Captured AFTER the "Faster cam functions" block above, so these are the final versions.
+            -- Note: cam.Start2D/cam.Start3D there call the original cam.Start through an upvalue,
+            -- so they never reach the cam.Start wrapper below and cannot double-count.
+            local cam_Start, cam_End = cam.Start, cam.End
+            local cam_Start2D, cam_End2D = cam.Start2D, cam.End2D
+            local cam_Start3D, cam_End3D = cam.Start3D, cam.End3D
+
+            local render_PushRenderTarget, render_PopRenderTarget = render.PushRenderTarget, render.PopRenderTarget
+            local render_SetViewPort = render.SetViewPort
+            local render_RenderView = render.RenderView
+
+            ---@diagnostic disable-next-line: duplicate-set-field
+            function cam.Start( data )
+                depth = depth + 1
+                return cam_Start( data )
+            end
+
+            function cam.End()
+                depth = depth - 1
+
+                if depth < 0 then
+                    depth = 0
+                end
+
+                return cam_End()
+            end
+
+            ---@diagnostic disable-next-line: duplicate-set-field
+            function cam.Start2D()
+                depth = depth + 1
+                return cam_Start2D()
+            end
+
+            function cam.End2D()
+                depth = depth - 1
+
+                if depth < 0 then
+                    depth = 0
+                end
+
+                return cam_End2D()
+            end
+
+            ---@diagnostic disable-next-line: duplicate-set-field
+            function cam.Start3D( origin, angles, fov, x, y, w, h, znear, zfar )
+                depth = depth + 1
+                return cam_Start3D( origin, angles, fov, x, y, w, h, znear, zfar )
+            end
+
+            function cam.End3D()
+                depth = depth - 1
+
+                if depth < 0 then
+                    depth = 0
+                end
+
+                return cam_End3D()
+            end
+
+            -- Pushes a new render target AND a new viewport ( the render target's size, unless given ).
+            function render.PushRenderTarget( texture, x, y, w, h )
+                depth = depth + 1
+                return render_PushRenderTarget( texture, x, y, w, h )
+            end
+
+            function render.PopRenderTarget()
+                depth = depth - 1
+
+                if depth < 0 then
+                    depth = 0
+                end
+
+                return render_PopRenderTarget()
+            end
+
+            -- Renders a whole scene, which may use its own viewport from the ViewData.
+            function render.RenderView( view )
+                depth = depth + 1
+                render_RenderView( view )
+                depth = depth - 1
+            end
+
+            -- "This function will override values of ScrW and ScrH with the ones you set."
+            function render.SetViewPort( x, y, w, h )
+                overridden = not ( x == 0 and y == 0 and w == width and h == height )
+                return render_SetViewPort( x, y, w, h )
+            end
+
+        end
+
+        -- Resync
+        do
+
+            cvars.AddChangeCallback( "gp_cache_screen_size", function( _, __, value )
+                enabled = tobool( value )
+            end, "glua.Patches - Screen size caching" )
+
+            hook_Add( "OnScreenSizeChanged", "glua.Patches - Screen size caching", function( _, __, new_width, new_height )
+                if new_width == nil or new_height == nil then
+                    new_width, new_height = ScrW(), ScrH()
+                end
+
+                width, height = new_width, new_height
+                width_640, height_480 = new_width / 640.0, new_height / 480.0
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
+            -- Runs once per frame, outside of any rendering context, so an addon that leaves a
+            -- context unbalanced ( or errors out of one ) cannot poison the cache permanently.
+            hook_Add( "PreRender", "glua.Patches - Screen size caching", function()
+                depth, overridden = 0, false
+                ---@diagnostic disable-next-line: redundant-parameter
+            end, PRE_HOOK )
+
+        end
+
+    end
+
     -- cl_drawhud chat fix
     do
 

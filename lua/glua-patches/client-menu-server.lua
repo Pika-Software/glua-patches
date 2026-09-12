@@ -210,4 +210,127 @@ if CLIENT then
 
     end
 
+    -- ConVar performance
+    do
+
+        local Variable_GetBool, Variable_GetString, Variable_IsFlagSet = Variable.GetBool, Variable.GetString, Variable.IsFlagSet
+        local util_TableToJSON, util_JSONToTable = util.TableToJSON, util.JSONToTable
+        local file_Exists, file_Read, file_Write = file.Exists, file.Read, file.Write
+        local file_Delete, file_IsDir, file_CreateDir = file.Delete, file.IsDir, file.CreateDir
+        local RunConsoleCommand = RunConsoleCommand
+        local GetConVar = GetConVar
+        local pairs, next = pairs, next
+
+        local dir_path = "glua_patches"
+        local file_path = "glua_patches/cvars.json"
+
+        local convar_list = {
+            -- Source default is 0. Valve's own help text: "Use -1 to default to hardware
+            -- settings", which is the right call on modern GPUs.
+            [ "r_fastzreject" ] = "-1"
+        }
+
+        -- Deliberately not included:
+        --   studio_queue_mode      - already defaults to 1, forcing it does nothing.
+        --   r_queued_ropes         - already defaults to 1, forcing it does nothing.
+        --   cl_threaded_bone_setup - part of the multicore set. History of launch crashes, and
+        --                            worse on the x86-64 / Chromium beta branch. Not worth it.
+        --   r_sse2                 - removed from the game in the September 2026 update.
+        --   snd_* / dsp_*          - the September 2026 update blocks the saved ones from Lua.
+
+        ---@type ConVar
+        ---@diagnostic disable-next-line: param-type-mismatch
+        local gp_cvars_performance = CreateConVar( "gp_cvars_performance", "1", FCVAR_ARCHIVE, "Force a set of client performance convars. Set to 0 to restore your original values." )
+
+        -- Returns the ConVar only if it exists and we are actually allowed to write to it.
+        -- The September 2026 update marked more convars as cheats, so this check matters.
+        local function GetWritable( name )
+            local convar = GetConVar( name )
+            if convar == nil then return nil end
+            if Variable_IsFlagSet( convar, FCVAR_CHEAT ) then return nil end
+            return convar
+        end
+
+        local function ReadBackup()
+            if not file_Exists( file_path, "DATA" ) then return {} end
+
+            local raw = file_Read( file_path, "DATA" )
+            if raw == nil then return {} end
+
+            return util_JSONToTable( raw ) or {}
+        end
+
+        local function WriteBackup( saved )
+            if next( saved ) == nil then
+                file_Delete( file_path )
+                return
+            end
+
+            if not file_IsDir( dir_path, "DATA" ) then
+                file_CreateDir( dir_path )
+            end
+
+            file_Write( file_path, util_TableToJSON( saved, true ) )
+        end
+
+        -- Only records a convar the first time we touch it. Without this guard a second run
+        -- would back up the values we already forced, destroying the user's originals.
+        local function Apply()
+            local saved, changed = ReadBackup(), false
+
+            for name, value in pairs( convar_list ) do
+                local convar = GetWritable( name )
+
+                if convar ~= nil then
+                    if saved[ name ] == nil then
+                        saved[ name ] = Variable_GetString( convar )
+                        changed = true
+                    end
+
+                    RunConsoleCommand( name, value )
+                end
+            end
+
+            if changed then
+                WriteBackup( saved )
+            end
+        end
+
+        local function Restore()
+            local saved = ReadBackup()
+            if next( saved ) == nil then return end
+
+            for name, value in pairs( saved ) do
+                if GetWritable( name ) ~= nil then
+                    RunConsoleCommand( name, value )
+                end
+            end
+
+            file_Delete( file_path )
+        end
+
+        local function Refresh()
+            if Variable_GetBool( gp_cvars_performance ) then
+                Apply()
+            else
+                Restore()
+            end
+        end
+
+        -- Initialize runs early, give the console a tick before issuing commands.
+        hook.Add( "Initialize", "glua.Patches - ConVar performance", function()
+            timer.Simple( 0, Refresh )
+            ---@diagnostic disable-next-line: redundant-parameter
+        end, PRE_HOOK )
+
+        cvars.AddChangeCallback( "gp_cvars_performance", Refresh, "glua.Patches - ConVar performance" )
+
+        -- Manual escape hatch, if something goes wrong and you want everything back now.
+        concommand.Add( "gp_cvars_restore", function()
+            Restore()
+            RunConsoleCommand( "gp_cvars_performance", "0" )
+        end, nil, "Restore the convar values gLua Patches changed." )
+
+    end
+
 end
