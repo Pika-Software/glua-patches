@@ -511,6 +511,7 @@ local function call( event_name, tbl, ... )
         for index = normal_counts[ event_name ], 1, -1 do
             if returnless[ index ] then
                 normal_fns[ index ]( ... )
+                -- TODO: create pre functions
             else
                 local n_a, n_b, n_c, n_d, n_e, n_f = normal_fns[ index ]( ... )
                 if n_a ~= nil then
