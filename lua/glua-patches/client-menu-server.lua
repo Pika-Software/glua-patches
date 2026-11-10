@@ -73,7 +73,7 @@ do
                 title = data.title,
                 updated = data.updated,
                 wsid = data.wsid
-           }
+            }
         end
 
         return lst
@@ -112,6 +112,12 @@ do
         return debug_getmetatable( value ) == COLOR
     end
 
+    ---@param value any
+    ---@return number
+    local function clamp_channel( value )
+        return math_min( math_max( tonumber( value, 10 ) or 0, 0 ), 255 )
+    end
+
     ---@param r number
     ---@param g number
     ---@param b number
@@ -119,10 +125,10 @@ do
     ---@return Color
     local function color( r, g, b, a )
         return setmetatable( {
-            r = math_min( tonumber( r, 10 ), 255 ),
-            g = math_min( tonumber( g, 10 ), 255 ),
-            b = math_min( tonumber( b, 10 ), 255 ),
-            a = math_min( tonumber( a or 255, 10 ), 255 )
+            r = clamp_channel( r ),
+            g = clamp_channel( g ),
+            b = clamp_channel( b ),
+            a = clamp_channel( a or 255 )
         }, COLOR )
     end
 
@@ -177,6 +183,7 @@ if CLIENT then
 
         hook.Add( "Tick", "glua.Patches - No more mouse lock", function()
             if system_HasFocus() or not Variable_GetBool( gp_no_more_mouse_lock ) or vgui_CursorVisible() or gui_IsGameUIVisible() then return end
+
             gui_ActivateGameUI()
         end )
 
@@ -188,7 +195,9 @@ if CLIENT then
         local last_no_focus_time = 0
 
         hook.Add( "CreateMove", "glua.Patches - No more fake attacks", function( cmd )
-            if ( CurTime() - last_no_focus_time ) < 0.25 then
+            local curtime = CurTime()
+
+            if (curtime - last_no_focus_time) < 0.25 then
                 local in_keys = cmd:GetButtons()
 
                 if bit_band( in_keys, 1 ) ~= 0 then
@@ -203,7 +212,8 @@ if CLIENT then
             end
 
             if system_HasFocus() then return end
-            last_no_focus_time = CurTime()
+
+            last_no_focus_time = curtime
 
             ---@diagnostic disable-next-line: redundant-parameter
         end, PRE_HOOK )

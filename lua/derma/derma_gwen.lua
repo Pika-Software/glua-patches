@@ -1,16 +1,21 @@
----@diagnostic disable-next-line: undefined-global
+---@diagnostic disable: duplicate-set-field
+
 local _G = _G
 
 ---@class Panel
-local PANEL = _G.FindMetaTable( "Panel" )
+local PANEL = FindMetaTable( "Panel" )
 
----@type IMaterial
+---@class IMaterial
 ---@diagnostic disable-next-line: assign-type-mismatch
-local IMaterial = _G.FindMetaTable( "IMaterial" )
+local IMaterial = FindMetaTable( "IMaterial" )
 local IMaterial_IsError = IMaterial.IsError
 
-local surface_SetDrawColor, surface_SetMaterial, surface_DrawTexturedRectUV = surface.SetDrawColor, surface.SetMaterial, surface.DrawTexturedRectUV
-local math_min, math_ceil, math_floor = math.min, math.ceil, math.floor
+local surface_DrawTexturedRectUV = surface.DrawTexturedRectUV
+local surface_SetDrawColor = surface.SetDrawColor
+local surface_SetMaterial = surface.SetMaterial
+
+local math_ceil, math_floor = math.ceil, math.floor
+local math_min = math.min
 
 ---@class GWEN
 local GWEN = {}
@@ -18,16 +23,29 @@ local GWEN = {}
 ---@diagnostic disable-next-line: inject-field
 _G.GWEN = GWEN
 
-function GWEN.CreateTextureBorder( x_offset, y_offset, width_offset, height_offset, l, t, r, b, material )
-    if material == nil or IMaterial_IsError( material ) then
-        ---@diagnostic disable-next-line: undefined-field
-        local skin = _G.SKIN
-        if skin ~= nil then
-            local gwen_material = skin.GwenTexture
-            if gwen_material ~= nil then
-                material = gwen_material
-            end
+local function resolve_gwen_material( material )
+    if material ~= nil and not IMaterial_IsError( material ) then
+        return material
+    end
+
+    ---@diagnostic disable-next-line: undefined-field
+    local skin = _G.SKIN
+    if skin ~= nil then
+        local gwen_material = skin.GwenTexture
+        if gwen_material ~= nil and not IMaterial_IsError( gwen_material ) then
+            return gwen_material
         end
+    end
+
+    return nil
+end
+
+local function empty() end
+
+function GWEN.CreateTextureBorder( x_offset, y_offset, width_offset, height_offset, l, t, r, b, material )
+    material = resolve_gwen_material( material )
+    if material == nil then
+        return empty
     end
 
     local texture = material:GetTexture( "$basetexture" )
@@ -64,22 +82,22 @@ function GWEN.CreateTextureBorder( x_offset, y_offset, width_offset, height_offs
         bottom = math_min( b, math_floor( h * 0.5 ) )
 
         left_offset = x + left
-        right_offset = x + ( w - right )
+        right_offset = x + (w - right)
 
         top_offset = y + top
-        bottom_offset = y + ( h - bottom )
+        bottom_offset = y + (h - bottom)
 
-        horizontal_width = w - ( left + right )
-        vertical_height = h - ( top + bottom )
+        horizontal_width = w - (left + right)
+        vertical_height = h - (top + bottom)
 
-        endU = startU + ( left / texture_width )
-        endV = startV + ( top / texture_height )
+        endU = startU + (left / texture_width)
+        endV = startV + (top / texture_height)
 
         endU2 = startU + width_offset
-        endU3 = endU2 - ( right / texture_width )
+        endU3 = endU2 - (right / texture_width)
 
         endV2 = startV + height_offset
-        endV3 = endV2 - ( bottom / texture_height )
+        endV3 = endV2 - (bottom / texture_height)
 
         surface_DrawTexturedRectUV( x, y, left, top, startU, startV, endU, endV )
 
@@ -99,25 +117,19 @@ function GWEN.CreateTextureBorder( x_offset, y_offset, width_offset, height_offs
 end
 
 function GWEN.CreateTextureNormal( x_offset, y_offset, width_offset, height_offset, material )
-    if material == nil or IMaterial_IsError( material ) then
-        ---@diagnostic disable-next-line: undefined-field
-        local skin = _G.SKIN
-        if skin ~= nil then
-            local gwen_material = skin.GwenTexture
-            if gwen_material ~= nil then
-                material = gwen_material
-            end
-        end
+    material = resolve_gwen_material( material )
+    if material == nil then
+        return empty
     end
 
     local texture = material:GetTexture( "$basetexture" )
     local texture_width, texture_height = texture:Width(), texture:Height()
 
     local startU = x_offset / texture_width
-    local endU = startU + ( width_offset / texture_width )
+    local endU = startU + (width_offset / texture_width)
 
     local startV = y_offset / texture_height
-    local endV = startV + ( height_offset / texture_height )
+    local endV = startV + (height_offset / texture_height)
 
     return function( x, y, w, h, color )
         if color == nil then
@@ -133,25 +145,19 @@ function GWEN.CreateTextureNormal( x_offset, y_offset, width_offset, height_offs
 end
 
 function GWEN.CreateTextureCentered( x_offset, y_offset, width_offset, height_offset, material )
-    if material == nil or IMaterial_IsError( material ) then
-        ---@diagnostic disable-next-line: undefined-field
-        local skin = _G.SKIN
-        if skin ~= nil then
-            local gwen_material = skin.GwenTexture
-            if gwen_material ~= nil then
-                material = gwen_material
-            end
-        end
+    material = resolve_gwen_material( material )
+    if material == nil then
+        return empty
     end
 
     local texture = material:GetTexture( "$basetexture" )
     local texture_width, texture_height = texture:Width(), texture:Height()
 
     local startU = x_offset / texture_width
-    local endU = startU + ( width_offset / texture_width )
+    local endU = startU + (width_offset / texture_width)
 
     local startV = y_offset / texture_height
-    local endV = startV + ( height_offset / texture_height )
+    local endV = startV + (height_offset / texture_height)
 
     return function( x, y, w, h, color )
         if color == nil then
@@ -161,25 +167,19 @@ function GWEN.CreateTextureCentered( x_offset, y_offset, width_offset, height_of
         end
 
         surface_SetMaterial( material )
-        surface_DrawTexturedRectUV( x + ( w - width_offset ) * 0.5, y + ( h - height_offset ) * 0.5, width_offset, height_offset, startU, startV, endU, endV )
+        surface_DrawTexturedRectUV( x + (w - width_offset) * 0.5, y + (h - height_offset) * 0.5, width_offset, height_offset, startU, startV, endU, endV )
     end
-
 end
 
 do
 
     local IMaterial_GetColor = IMaterial.GetColor
+    local color_white = Color( 255, 255, 255, 255 )
 
     function GWEN.TextureColor( x, y, material )
-        if material == nil or IMaterial_IsError( material ) then
-            ---@diagnostic disable-next-line: undefined-field
-            local skin = _G.SKIN
-            if skin ~= nil then
-                local gwen_material = skin.GwenTexture
-                if gwen_material ~= nil then
-                    material = gwen_material
-                end
-            end
+        material = resolve_gwen_material( material )
+        if material == nil then
+            return color_white
         end
 
         return IMaterial_GetColor( material, x, y )
@@ -190,7 +190,7 @@ end
 do
 
     local Panel_SetMultiline, Panel_Add = PANEL.SetMultiline, PANEL.Add
-    local pairs = _G.pairs
+    local pairs = pairs
 
     local classes = {
         Base = "Panel",
@@ -256,20 +256,20 @@ end
 
 do
 
-    local SetPos = PANEL.SetPos
+    local PANEL_SetPos = PANEL.SetPos
 
     function PANEL:GWEN_SetPosition( tbl )
-        return SetPos( self, tbl.x, tbl.y )
+        return PANEL_SetPos( self, tbl.x, tbl.y )
     end
 
 end
 
 do
 
-    local SetSize = PANEL.SetSize
+    local PANEL_SetSize = PANEL.SetSize
 
     function PANEL:GWEN_SetSize( tbl )
-        return SetSize( self, tbl.w, tbl.h )
+        return PANEL_SetSize( self, tbl.w, tbl.h )
     end
 
 end
@@ -279,25 +279,25 @@ PANEL.GWEN_SetControlName = PANEL.SetName
 
 do
 
-    local DockMargin = PANEL.DockMargin
+    local PANEL_DockMargin = PANEL.DockMargin
 
     function PANEL:GWEN_SetMargin( tbl )
-        return DockMargin( self, tbl.left, tbl.top, tbl.right, tbl.bottom )
+        return PANEL_DockMargin( self, tbl.left, tbl.top, tbl.right, tbl.bottom )
     end
 
 end
 
 do
 
-    local tonumber = _G.tonumber
+    local tonumber = tonumber
 
     do
 
         ---@diagnostic disable-next-line: undefined-field
-        local SetMin = PANEL.SetMin
+        local PANEL_SetMin = PANEL.SetMin
 
         function PANEL:GWEN_SetMin( min )
-            return SetMin( self, tonumber( min, 10 ) )
+            return PANEL_SetMin( self, tonumber( min, 10 ) )
         end
 
     end
@@ -305,10 +305,10 @@ do
     do
 
         ---@diagnostic disable-next-line: undefined-field
-        local SetMax = PANEL.SetMax
+        local PANEL_SetMax = PANEL.SetMax
 
         function PANEL:GWEN_SetMax( max )
-            return SetMax( self, tonumber( max, 10 ) )
+            return PANEL_SetMax( self, tonumber( max, 10 ) )
         end
 
     end
@@ -318,24 +318,24 @@ end
 do
 
     local align = {
-        ["None"] = 0,
-        ["Bottom-Left"] = 1,
-        ["Bottom"] = 2,
-        ["Bottom-Right"] = 3,
-        ["Left"] = 4,
-        ["Center"] = 5,
-        ["Right"] = 6,
-        ["Top-Left"] = 7,
-        ["Top"] = 8,
-        ["Top-Right"] = 9
+        [ "None" ] = 0,
+        [ "Bottom-Left" ] = 1,
+        [ "Bottom" ] = 2,
+        [ "Bottom-Right" ] = 3,
+        [ "Left" ] = 4,
+        [ "Center" ] = 5,
+        [ "Right" ] = 6,
+        [ "Top-Left" ] = 7,
+        [ "Top" ] = 8,
+        [ "Top-Right" ] = 9
     }
 
-    local SetContentAlignment = PANEL.SetContentAlignment
+    local PANEL_SetContentAlignment = PANEL.SetContentAlignment
 
     function PANEL:GWEN_SetHorizontalAlign( key )
         local uint_value = align[ key ]
         if uint_value ~= nil then
-            SetContentAlignment( self, uint_value )
+            PANEL_SetContentAlignment( self, uint_value )
         end
     end
 
@@ -351,12 +351,12 @@ do
         Bottom = 5
     }
 
-    local Dock = PANEL.Dock
+    local PANEL_Dock = PANEL.Dock
 
     function PANEL:GWEN_SetDock( key )
         local uint_value = dock[ key ]
         if uint_value ~= nil then
-            Dock( self, uint_value )
+            PANEL_Dock( self, uint_value )
         end
     end
 
