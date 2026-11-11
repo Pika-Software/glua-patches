@@ -438,7 +438,7 @@ do
 
         setmetatable( entity_to_index, {
             __index = function( self, entity )
-                if CLIENT and debug_getmetatable( self ) == CSENT then
+                if CLIENT and debug_getmetatable( entity ) == CSENT then
                     self[ entity ] = -1 -- i hate this, but i have no choice here
                     return -1
                 end
@@ -548,7 +548,7 @@ do
 
         setmetatable( player_to_steamid, {
             __index = function( self, pl )
-                if ENTITY_IsValid( self ) then
+                if ENTITY_IsValid( pl ) then
                     local value
 
                     if pl:IsBot() then

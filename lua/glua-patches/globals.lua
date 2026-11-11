@@ -3,7 +3,7 @@ if glua_patches ~= nil then return end
 
 ---@class glua_patches
 glua_patches = glua_patches or {}
-glua_patches.Version = "1.20.4"
+glua_patches.Version = "1.20.5"
 
 local table = table
 local coroutine = coroutine
