@@ -36,6 +36,12 @@ local CONVAR = FindMetaTable( "ConVar" )
 ---@class Vehicle
 local VEHICLE = FindMetaTable( "Vehicle" )
 
+---@class CSEnt
+local CSENT = FindMetaTable( "CSEnt" )
+
+---@diagnostic disable-next-line: cast-type-mismatch
+---@cast CSENT CSEnt | nil
+
 -- by https://github.com/Astralcircle
 do
 
@@ -91,6 +97,10 @@ do
         [ NPC ] = true,
         [ VEHICLE ] = true
     }
+
+    if CSENT ~= nil then
+        entity_metas[ CSENT ] = true
+    end
 
     ---@param value any
     ---@return boolean
@@ -428,7 +438,17 @@ do
 
         setmetatable( entity_to_index, {
             __index = function( self, entity )
-                local index = ENTITY_EntIndex( entity ) or -1
+                if CLIENT and debug_getmetatable( self ) == CSENT then
+                    self[ entity ] = -1 -- i hate this, but i have no choice here
+                    return -1
+                end
+
+                local index = 0
+
+                if ENTITY_IsValid( entity ) then
+                    index = ENTITY_EntIndex( entity ) or index
+                end
+
                 self[ entity ] = index
                 return index
             end,
@@ -438,11 +458,7 @@ do
     end
 
     function ENTITY:EntIndex()
-        if ENTITY_IsValid( self ) then
-            return entity_to_index[ self ]
-        end
-
-        return -1
+        return entity_to_index[ self ]
     end
 
     ---@type table<Entity, string>
@@ -468,11 +484,7 @@ do
     end
 
     function ENTITY:GetClass()
-        if ENTITY_IsValid( self ) then
-            return entity_to_class[ self ]
-        end
-
-        return "NULL"
+        return entity_to_class[ self ]
     end
 
     ---@type table<Player, integer>
@@ -498,11 +510,7 @@ do
     end
 
     function PLAYER:UserID()
-        if ENTITY_IsValid( self ) then
-            return player_to_uid[ self ]
-        end
-
-        return -1
+        return player_to_uid[ self ]
     end
 
     local player_is_bot
@@ -526,11 +534,7 @@ do
         } )
 
         function PLAYER:IsBot()
-            if ENTITY_IsValid( self ) then
-                return player_is_bot[ self ]
-            end
-
-            return false
+            return player_is_bot[ self ]
         end
 
     end
@@ -544,16 +548,20 @@ do
 
         setmetatable( player_to_steamid, {
             __index = function( self, pl )
-                local value
+                if ENTITY_IsValid( self ) then
+                    local value
 
-                if pl:IsBot() then
-                    value = "STEAM_0:0:" .. player_to_uid[ pl ] -- fake steamid for bots
-                else
-                    value = PLAYER_SteamID( pl )
+                    if pl:IsBot() then
+                        value = "STEAM_0:0:" .. player_to_uid[ pl ] -- fake steamid for bots
+                    else
+                        value = PLAYER_SteamID( pl )
+                    end
+
+                    self[ pl ] = value
+                    return value
                 end
 
-                self[ pl ] = value
-                return value
+                return "STEAM_ID_PENDING"
             end,
             __mode = "k"
         } )
@@ -561,11 +569,7 @@ do
     end
 
     function PLAYER:SteamID()
-        if ENTITY_IsValid( self ) then
-            return player_to_steamid[ self ]
-        end
-
-        return "STEAM_ID_PENDING"
+        return player_to_steamid[ self ]
     end
 
     ---@type table<Player, string>
@@ -594,11 +598,7 @@ do
     end
 
     function PLAYER:SteamID64()
-        if ENTITY_IsValid( self ) then
-            return player_to_steamid64[ self ]
-        end
-
-        return "0"
+        return player_to_steamid64[ self ]
     end
 
     ---@type table<Player, string>
@@ -629,11 +629,7 @@ do
         end
 
         local function get_name( pl )
-            if ENTITY_IsValid( pl ) then
-                return player_to_nick[ pl ]
-            end
-
-            return ""
+            return player_to_nick[ pl ]
         end
 
         PLAYER.GetName = get_name
@@ -641,25 +637,43 @@ do
 
     end
 
-    local function clearEntityCache( entity )
-        entity_to_class[ entity ] = nil
-        entity_to_index[ entity ] = nil
+    ---@type Entity[]
+    local cleanup_queue = { [ 0 ] = 0 }
 
-        if entity:IsPlayer() then
-            player_to_nick[ entity ] = nil
-            player_to_uid[ entity ] = nil
+    hook_Add( "Tick", "glua.Patches - Entity & player cache", function()
+        local queue_size = cleanup_queue[ 0 ]
+        if queue_size == 0 then return end
 
-            player_to_steamid[ entity ] = nil
-            player_to_steamid64[ entity ] = nil
+        for i = 1, queue_size, 1 do
+            ---@type Entity
+            ---@diagnostic disable-next-line: assign-type-mismatch
+            local entity = cleanup_queue[ i ]
+            if entity ~= nil then
+                entity_to_class[ entity ] = nil
+                entity_to_index[ entity ] = nil
 
-            if CLIENT then
-                player_is_bot[ entity ] = nil
+                if entity:IsPlayer() then
+                    player_to_nick[ entity ] = nil
+                    player_to_uid[ entity ] = nil
+
+                    player_to_steamid[ entity ] = nil
+                    player_to_steamid64[ entity ] = nil
+
+                    if CLIENT then
+                        player_is_bot[ entity ] = nil
+                    end
+                end
             end
         end
-    end
 
-    ---@diagnostic disable-next-line: redundant-parameter
-    hook_Add( "EntityRemoved", "glua.Patches - Entity & player cache", clearEntityCache, PRE_HOOK )
+        cleanup_queue = { [ 0 ] = 0 }
+    end, PRE_HOOK )
+
+    hook_Add( "EntityRemoved", "glua.Patches - Entity & player cache", function( entity )
+        local queue_size = cleanup_queue[ 0 ] + 1
+        cleanup_queue[ queue_size ] = entity
+        cleanup_queue[ 0 ] = queue_size
+    end, PRE_HOOK )
 
 end
 
@@ -671,9 +685,8 @@ do
 
     local distance = 4096 * 8
 
-    local quick_trace = {}
-    local eye_trace = {}
-    local aim_trace = {}
+    local trace = {}
+    setmetatable( trace, { __mode = "v" } )
 
     function util.GetPlayerTrace( pl, dir )
         local start = pl:EyePos()
@@ -686,11 +699,11 @@ do
     end
 
     function util.QuickTrace( origin, dir, filter )
-        quick_trace.start = origin
-        quick_trace.endpos = origin + dir
-        quick_trace.filter = filter
+        trace.start = origin
+        trace.endpos = origin + dir
+        trace.filter = filter
 
-        return TraceLine( quick_trace )
+        return TraceLine( trace )
     end
 
     function PLAYER:GetEyeTrace()
@@ -704,11 +717,11 @@ do
 
         local start = self:EyePos()
 
-        eye_trace.start = start
-        eye_trace.endpos = start + (self:GetAimVector() * distance)
-        eye_trace.filter = self
+        trace.start = start
+        trace.endpos = start + (self:GetAimVector() * distance)
+        trace.filter = self
 
-        local traceResult = TraceLine( eye_trace )
+        local traceResult = TraceLine( trace )
         self.m_tEyeTrace = traceResult
         return traceResult
     end
@@ -724,11 +737,11 @@ do
 
         local start = self:EyePos()
 
-        aim_trace.start = start
-        aim_trace.endpos = start + (self:EyeAngles():Forward() * distance)
-        aim_trace.filter = self
+        trace.start = start
+        trace.endpos = start + (self:EyeAngles():Forward() * distance)
+        trace.filter = self
 
-        local traceResult = TraceLine( aim_trace )
+        local traceResult = TraceLine( trace )
         self.m_tAimTrace = traceResult
         return traceResult
     end

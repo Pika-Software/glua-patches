@@ -3,7 +3,7 @@ if glua_patches ~= nil then return end
 
 ---@class glua_patches
 glua_patches = glua_patches or {}
-glua_patches.Version = "1.20.3"
+glua_patches.Version = "1.20.4"
 
 local table = table
 local coroutine = coroutine
@@ -227,6 +227,8 @@ do
 
     do
 
+        ---@type fun( x: number, y: number, z: number ): Vector
+        ---@diagnostic disable-next-line: assign-type-mismatch
         local Vector = Vector
 
         ---@param min number
@@ -241,6 +243,8 @@ do
 
     do
 
+        ---@type fun( p: number, y: number, r: number ): Angle
+        ---@diagnostic disable-next-line: assign-type-mismatch
         local Angle = Angle
 
         ---@param min number

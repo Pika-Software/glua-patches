@@ -27,5 +27,7 @@ MsgC( SERVER and Color( 50, 100, 250 ) or Color( 250, 100, 50 ), string.format( 
     "When everything is wrong, we move along ♪",
     "Move along, move along like I know ya do ♪",
     "I'll prevail with every battle if I'm right ♪",
-    "Look at where we started and where we will end ♪"
+    "Look at where we started and where we will end ♪",
+    "I'll be moving' on, humdadadada ♪",
+    "Step into the light ♪"
 } ) .. "\n" )
